@@ -61,29 +61,26 @@ normalize:
 
 ## BEGIN: CI/CD related targets
 ##
-
-cicd.clean: clean.github.actions
-
-clean.github.actions:
-	@#
-	@#
-	query=".workflow_runs[].id" \
-	&& org_name=`pynchon github cfg|jq -r .org_name` \
-	&& repo_name=`pynchon github cfg|jq -r .repo_name` \
-	&& repo_name="$${org_name}/$${repo_name}" \
-	&& set -x && failed_runs=$$(\
-		gh api --paginate \
-			-X GET "/repos/$${repo_name}/actions/runs" \
-			-F status=failure -q "$${query}") \
-	&& for run_id in $${failed_runs}; do \
-		echo "Deleting failed run ID: $${run_id}"; \
-		gh api -X DELETE "/repos/$${repo_name}/actions/runs/$${run_id}"; \
-	done
+# cicd.clean: clean.github.actions
+# clean.github.actions:
+# 	@#
+# 	@#
+# 	query=".workflow_runs[].id" \
+# 	&& org_name=`pynchon github cfg|jq -r .org_name` \
+# 	&& repo_name=`pynchon github cfg|jq -r .repo_name` \
+# 	&& repo_name="$${org_name}/$${repo_name}" \
+# 	&& set -x && failed_runs=$$(\
+# 		gh api --paginate \
+# 			-X GET "/repos/$${repo_name}/actions/runs" \
+# 			-F status=failure -q "$${query}") \
+# 	&& for run_id in $${failed_runs}; do \
+# 		echo "Deleting failed run ID: $${run_id}"; \
+# 		gh api -X DELETE "/repos/$${repo_name}/actions/runs/$${run_id}"; \
+# 	done
 
 ## BEGIN: Testing entrypoints
 ##
 ##
-
 test-suite/%:
 	@# Generic test-suite runner, just provide the test-suite name.
 	@# (Names are taken from the files like "tests/Makefile.<name>.mk")
@@ -125,15 +122,14 @@ etest e2e-test: test-suite/e2e/all
 	@# by walking through cluster-lifecycle stuff inside a 
 	@# project-local kubernetes cluster.
 
-lme-test: test-suite/lme
-	@# Logging/Metrics/Events demo.  FIXME
-
-mad: mad/all 
-mad/%:; set -x && make test-suite/mad-science/${*}
-	@# Polyglot tests, mad-science, and other bad ideas that
-	@# allow make-targets to be written in real programming languages,
-	@# embedding docker-containers in make-defines, and quickly mapping 
-	@# containerized APIs onto make-targets.
+# lme-test: test-suite/lme
+# 	@# Logging/Metrics/Events demo.  FIXME
+# mad: mad/all 
+# mad/%:; set -x && make test-suite/mad-science/${*}
+# 	@# Polyglot tests, mad-science, and other bad ideas that
+# 	@# allow make-targets to be written in real programming languages,
+# 	@# embedding docker-containers in make-defines, and quickly mapping 
+# 	@# containerized APIs onto make-targets.
 
 ## BEGIN: Documentation related targets
 ##

@@ -7,7 +7,7 @@
 #   for version-overrides without editing[2], etc.
 #
 # DOCS: https://github.com/elo-enterprises/k8s-tools#features
-# LATEST: https://github.com/elo-enterprises/k8s-tools/tree/master/k8s-tools.yml
+# LATEST: https://robot-wranglers.github.io/k8s-tools/tree/master/k8s-tools.yml
 #
 # MANIFEST:
 #   Local parts of the tool bundle:
@@ -21,7 +21,7 @@
 #
 # REFS:
 #   [1] https://docs.docker.com/compose/environment-variables/set-environment-variables/#cli
-#   [2] https://github.com/elo-enterprises/k8s-tools/tree/master/docs/env-vars.md#k8s-toolsyml
+#   [2] https://robot-wranglers.github.io/k8s-tools/tree/master/docs/env-vars.md#k8s-toolsyml
 #
 services:
   k8s: &base
@@ -94,12 +94,12 @@ services:
     tty: true 
   
   # https://github.com/charmbracelet/gum
-  gum:
-    <<: *base
-    image: k8s:gum
-    hostname: k8s:gum
-    entrypoint: gum
-    tty: false
+  # gum:
+  #   <<: *base
+  #   image: k8s:gum
+  #   hostname: k8s:gum
+  #   entrypoint: gum
+  #   tty: false
 
   # https://helm.sh/docs/
   helm:
@@ -408,7 +408,7 @@ services:
     volumes: 
       - ${PWD}:${workspace:-/workspace}
 
-  # https://github.com/elo-enterprises/k8s-tools#embedded-tui
+  # https://robot-wranglers.github.io/k8s-tools/#embedded-tui
   dind: &dind
     <<: *base 
     depends_on: ['k8s']
@@ -454,7 +454,7 @@ services:
         # RUN wget https://get.helm.sh/helm-${HELM_CLI_VERSION:-v3.14.4}-linux-amd64.tar.gz && tar -zxvf helm* && mv */helm /usr/bin
         USER ${DOCKER_UGNAME:-root}
 
-  # https://github.com/elo-enterprises/k8s-tools#embedded-tui
+  # https://robot-wranglers.github.io/k8s-tools/#embedded-tui
   tui: 
     <<: *base
     hostname: k8s:tui

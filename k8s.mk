@@ -3,9 +3,9 @@
 # k8s.mk: 
 #   Automation library/framework/tool building on compose.mk and k8s-tools.yml
 #
-# DOCS: https://github.com/elo-enterprises/k8s-tools#k8smk
+# DOCS: https://robot-wranglers.github.io/k8s-tools#k8smk
 #
-# LATEST: https://github.com/elo-enterprises/k8s-tools/tree/master/k8s.mk
+# LATEST: https://robot-wranglers.github.io/k8s-tools/tree/master/k8s.mk
 #
 # FEATURES:
 #   1) ....................................................
@@ -34,7 +34,7 @@
 #
 # HINTS:
 #   1) The goal is that the implementation is well tested, nearly frozen, and generally safe to ignore!
-#   2) If you just want API or other docs, see https://github.com/elo-enterprises/k8s-tools#compose.mk
+#   2) If you just want API or other docs, see https://robot-wranglers.github.io/k8s-tools#compose.mk
 #   3) If you need to work on this file, you want Makefile syntax-highlighting & tab/spaces visualization.
 #
 #░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
@@ -126,7 +126,7 @@ export ALPINE_K8S_VERSION?=alpine/k8s:1.30.0
 ## END Data & Macros
 ## BEGIN 'ansible.*' targets
 ## DOCS: 
-##   [1] https://github.com/elo-enterprises/k8s-tools/docs/api#api-ansible
+##   [1] https://robot-wranglers.github.io/k8s-tools/api#api-ansible
 #░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 
 # This filter takes the standard JSON output from ansible and cleans it using the assumption
@@ -298,7 +298,7 @@ ansible.run/%: .ansible.require
 ## END 'ansible.*' targets
 ## BEGIN 'helm.*' targets
 ## DOCS: 
-##   [1] https://github.com/elo-enterprises/k8s-tools/docs/api#api-helm
+##   [1] https://robot-wranglers.github.io/k8s-tools/api#api-helm
 #░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 
 helm.repo.add/%:
@@ -333,7 +333,7 @@ helm.chart.install/%:
 ## Most targets are small utilities that can help to keep common tasks idempotent, but there's also a TUI that provides a useful overview of what's going on with K3d
 ##
 ## DOCS: 
-##   [1]: https://github.com/elo-enterprises/k8s-tools/docs/api#api-k3d\
+##   [1]: https://robot-wranglers.github.io/k8s-tools/api#api-k3d\
 ##   [2]:
 #░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 
@@ -441,7 +441,7 @@ k3d.stat:
 ##
 ##
 ## DOCS: 
-##   [1] https://github.com/elo-enterprises/k8s-tools/docs/api#api-k8s
+##   [1] https://robot-wranglers.github.io/k8s-tools/api#api-k8s
 #░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 
 k8s.get/%:
@@ -836,7 +836,7 @@ k8s.wait k8s.cluster.wait: k8s.namespace.wait/all
 ## END 'k8s.*' targets
 ## BEGIN '.k8s.*' private targets
 ## DOCS: 
-##   [1] https://github.com/elo-enterprises/k8s-tools/docs/api#api-k8s
+##   [1] https://robot-wranglers.github.io/k8s-tools/api#api-k8s
 
 k8s.stat.auth:
 	$(call log, ${GLYPH_K8S} ${@} ${sep}${dim} kubectl auth whoami )
@@ -889,7 +889,7 @@ k8s.stat.ctx:
 ## Forwarding is not just for ports but for DNS as well. **This takes effect everywhere, including the containers in k8s-tools.yml (via /etc/hosts bind-mount), as it does on the docker-host.**
 ##
 ## DOCS: 
-##   [1] https://github.com/elo-enterprises/k8s-tools/docs/api#api-k8smk
+##   [1] https://robot-wranglers.github.io/k8s-tools/api#api-k8smk
 #░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 
 kubefwd.panic:
@@ -999,7 +999,7 @@ kubefwd.start/% k8s.namespace.fwd/%:
 ## END 'kubefwd.*' targets
 ## BEGIN Misc targets
 ## DOCS: 
-##   [1] https://github.com/elo-enterprises/k8s-tools/docs/api#api-k8smk
+##   [1] https://robot-wranglers.github.io/k8s-tools/api#api-k8smk
 #░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 
 ktop: ktop/all
@@ -1042,7 +1042,7 @@ k9: k9s
 ## END misc targets
 ## BEGIN 'tui.*' targets
 ## DOCS: 
-##   [1] https://github.com/elo-enterprises/k8s-tools/docs/api#api-tui
+##   [1] https://robot-wranglers.github.io/k8s-tools/api#api-tui
 #░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 
 # FIXME: not dry 
