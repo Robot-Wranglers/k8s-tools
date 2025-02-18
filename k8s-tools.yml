@@ -1,0 +1,481 @@
+#!/usr/bin/env -S docker compose -f
+# k8s-tools.yml: 
+#
+#   Collect, pin & customize versions for your whole k8s toolchain in one place
+#   This docker-compose file describes various tool containers, sets up reasonable
+#   defaults for volumes, includes fixes for root-container permissions, allows 
+#   for version-overrides without editing[2], etc.
+#
+# DOCS: https://github.com/elo-enterprises/k8s-tools#features
+# LATEST: https://github.com/elo-enterprises/k8s-tools/tree/master/k8s-tools.yml
+#
+# MANIFEST:
+#   Local parts of the tool bundle:
+#     helmify, kompose, kubefwd, lazydocker,
+#     kind, argocli, kn, k3d, k9s, fission, rancher,
+#     plus the TUI / DIND base images.
+#   Upstream part of the tool bundle (See alpine/k8s docs):
+#     kubectl, kustomize, krew, vals, kubeconform, kubeseal, 
+#     helm, helm-diff, helm-unittest, helm-push, eksctl, 
+#     aws-iam-authenticator, awscli v1
+#
+# REFS:
+#   [1] https://docs.docker.com/compose/environment-variables/set-environment-variables/#cli
+#   [2] https://github.com/elo-enterprises/k8s-tools/tree/master/docs/env-vars.md#k8s-toolsyml
+#
+services:
+  k8s: &base
+    hostname: k8s-base
+    environment: &base_environment
+      AWS_PROFILE: ${AWS_PROFILE:-}
+      KUBECONFIG: /home/${DOCKER_UGNAME:-root}/.kube/config
+      DOCKER_UID: ${DOCKER_UID:-1000}
+      DOCKER_GID: ${DOCKER_GID:-1000}
+      DOCKER_UGNAME: ${DOCKER_UGNAME:-root}
+      DOCKER_HOST_WORKSPACE: ${DOCKER_HOST_WORKSPACE:-${PWD}}
+      TERM: ${TERM:-xterm-256color}
+      PS1: '\u@\[\033[1;97;4m\]\h\[\033[0m\]:\w\$ '
+    build:
+      tags: ['k8s:base', 'k8s:k8s']
+      context: .
+      dockerfile_inline: |
+        FROM ${ALPINE_K8S_VERSION:-alpine/k8s:1.30.0} as builder
+        RUN cp /krew-* /usr/bin/krew
+        FROM ghcr.io/charmbracelet/gum as gum
+        FROM ${ALPINE_K8S_VERSION:-alpine/k8s:1.30.0} 
+        COPY --from=gum /usr/local/bin/gum /usr/bin
+        COPY --from=builder /usr/bin/krew /usr/bin/
+        RUN apk --no-cache add procps make ncurses shadow coreutils pv uuidgen
+        RUN echo ${DOCKER_GID:-1000} && getent group ${DOCKER_GID:-1000} \
+          || groupadd --gid ${DOCKER_GID:-1000} docker
+        RUN getent passwd ${DOCKER_UGNAME:-root} || \
+          useradd --uid ${DOCKER_UID:-1000} --create-home \
+          -g ${DOCKER_GID:-1000} ${DOCKER_UGNAME:-root}
+        RUN mkdir -p /home/${DOCKER_UGNAME:-root}/.kube /home/${DOCKER_UGNAME:-root}/.krew /home/${DOCKER_UGNAME:-root}/.config
+        RUN KREW_ROOT=/home/${DOCKER_UGNAME:-root}/.krew krew install ctx ns graph sick-pods ktop 
+        RUN KREW_ROOT=/home/${DOCKER_UGNAME:-root}/.krew krew install ${KREW_PLUGINS:-ctx}
+        RUN cp /home/${DOCKER_UGNAME:-root}/.krew/bin/kubectl-ns /usr/bin/kubens
+        RUN cp /home/${DOCKER_UGNAME:-root}/.krew/bin/kubectl-ctx /usr/bin/kubectx
+        RUN cp /home/${DOCKER_UGNAME:-root}/.krew/bin/* /usr/bin
+        RUN chown -R ${DOCKER_UID:-1000}:${DOCKER_GID:-1000} /home/${DOCKER_UGNAME:-root}/
+        RUN curl -sL https://raw.githubusercontent.com/holman/spark/master/spark -o /usr/bin/spark && chmod +x /usr/bin/spark
+        USER ${DOCKER_UGNAME:-root}
+        ENV PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/home/${DOCKER_UGNAME:-root}/.krew/bin
+    # NB: Left for reference, and possibly required by older versions of docker or certain configurations?  
+    # user: ${DOCKER_UID:-1000}:${DOCKER_GID:-1000}
+    network_mode: host
+    working_dir: /workspace
+    volumes:
+      # Share the docker sock.  Almost everything will need this
+      - ${DOCKER_SOCKET:-/var/run/docker.sock}:/var/run/docker.sock
+      # Share /etc/hosts, so tool containers have access to any custom or kubefwd'd DNS
+      - /etc/hosts:/etc/hosts:ro
+      # Share the working directory with containers.  
+      # Overrides are allowed for the workspace, which is occasionally useful with DIND
+      - ${workspace:-${PWD}}:/workspace
+      # OSX tmpfiles
+      - /var/folders/:/var/folders/
+      # NB: `.cache` and `.config` as below are used by helm, maybe others?
+      # - ${HOME}/.cache:/home/${DOCKER_UGNAME:-root}/.cache
+      # - ${HOME}/.config/helm:/home/${DOCKER_UGNAME:-root}/.config/helm
+      # - ${HOME}/.local:/home/${DOCKER_UGNAME:-root}/.local:ro
+      
+      # NB: Recommended approach for kubeconfig.  
+      # Use something like this if you only want to share one file.
+      - "${KUBECONFIG:-~/.kube/config}:/home/${DOCKER_UGNAME:-root}/.kube/config"
+      
+      # NB: Another approach to kubeconfig is sharing ~/.kube directly. 
+      # This is not recommended because it may involve different krew plugins, 
+      # and may conflict with simpler usage of KUBECONFIG.
+      # - ${HOME}/.kube:/home/${DOCKER_UGNAME:-root}/.kube
+      
+      # NB: Add this if you're working with EKS and need AWS creds, similar for azure
+      # - ${HOME}/.aws:/home/${DOCKER_UGNAME:-root}/.aws
+    tty: true 
+  
+  # https://github.com/charmbracelet/gum
+  gum:
+    <<: *base
+    image: k8s:gum
+    hostname: k8s:gum
+    entrypoint: gum
+    tty: false
+
+  # https://helm.sh/docs/
+  helm:
+    <<: *base
+    entrypoint: helm
+    hostname: k8s:helm
+  
+  # https://kubernetes.io/docs/reference/kubectl/
+  kubectl:
+    <<: *base
+    entrypoint: kubectl
+    hostname: k8s:kubectl
+
+  # https://github.com/kubernetes-sigs/kustomize
+  kustomize:
+    <<: *base
+    entrypoint: kustomize
+    hostname: k8s:kustomize
+
+  # https://github.com/databus23/helm-diff
+  helm-diff:
+    <<: *base
+    entrypoint: helm-diff
+    hostname: k8s:helm-diff
+
+  # https://github.com/helm-unittest/helm-unittest
+  helm-unittest:
+    <<: *base
+    entrypoint: helm-unittest
+    hostname: k8s:helm-unittest
+
+  # https://github.com/chartmuseum/helm-push
+  helm-push:
+    <<: *base
+    entrypoint: helm-push
+    hostname: k8s:helm-push
+
+  # https://github.com/kubernetes-sigs/aws-iam-authenticator
+  aws-iam-authenticator:
+    <<: *base
+    entrypoint: aws-iam-authenticator
+    hostname: k8s:aws-iam-authenticator
+    tty: true
+
+  # https://github.com/weaveworks/eksctl
+  eksctl:
+    <<: *base
+    entrypoint: eksctl
+    hostname: k8s:eksctl
+
+  # https://github.com/aws/aws-cli
+  awscli: # v1
+    <<: *base
+    entrypoint: awscli
+    hostname: k8s:awscli
+  
+  # https://docs.aws.amazon.com/cdk
+  # FIXME: needs a python stack for many use-cases
+  cdk:
+    <<: *base
+    hostname: k8s:cdk 
+    entrypoint: cdk 
+    build: 
+      tags: ['k8s:cdk']
+      context: . 
+      dockerfile_inline: |
+        FROM node:lts-iron
+        RUN npm i -g aws-cdk@${CDK_CLI_VERSION:-2.149.0}
+    
+  # https://github.com/bitnami-labs/sealed-secrets
+  kubeseal:
+    <<: *base
+    entrypoint: kubeseal
+    hostname: k8s:kubeseal
+
+  # https://github.com/kubernetes-sigs/krew
+  krew:
+    <<: *base
+    entrypoint: krew
+    hostname: k8s:krew
+
+  # https://github.com/helmfile/vals
+  vals:
+    <<: *base
+    entrypoint: vals
+    hostname: k8s:vals
+
+  # https://github.com/yannh/kubeconform
+  kubeconform:
+    <<: *base
+    entrypoint: kubeconform
+    hostname: k8s:kubeconform
+  # https://knative.dev/docs/client/install-kn/
+  kn: &knative
+    <<: *base
+    depends_on: ['k8s']
+    hostname: k8s:kn
+    build:
+      tags: ['k8s:kn']
+      context: .
+      dockerfile_inline: |
+        FROM k8s:base as base
+        FROM ghcr.io/knative/func/func as builder
+        FROM gcr.io/knative-releases/knative.dev/client/cmd/kn:${KN_CLI_VERSION:-v1.14.0}
+        COPY --from=builder /ko-app/func /ko-app/func
+        COPY --from=base /usr/bin/kubectl /usr/bin/
+        RUN apk --no-cache add bash procps make
+        RUN cp /ko-app/func /usr/bin/kn-func
+
+  # https://github.com/arttor/helmify
+  helmify:
+    <<: *base
+    depends_on: ['k8s']
+    hostname: k8s:helmify
+    build:
+      tags: ['k8s:helmify']
+      context: .
+      dockerfile_inline: |
+        FROM ${DEBIAN_CONTAINER_VERSION:-debian:bookworm}
+        RUN apt-get update && apt-get install -y curl
+        RUN cd /tmp && curl -s -Lo helmify.tgz \
+            https://github.com/arttor/helmify/releases/download/${HELMIFY_CLI_VERSION:-v0.4.12}/helmify_Linux_i386.tar.gz
+        RUN cd /tmp && tar -zxvf helmify.tgz && chmod +x helmify && mv helmify /usr/local/bin/
+    entrypoint: helmify
+    tty: false
+    stdin_open: true
+
+  # https://fission.io/docs/installation/
+  fission:
+    <<: *base
+    depends_on: ['k8s']
+    hostname: k8s:fission
+    build:
+      tags: ['k8s:fission']
+      context: .
+      dockerfile_inline: |
+        FROM k8s:base
+        USER root 
+        RUN curl -s -Lo fission \
+            https://github.com/fission/fission/releases/download/${FISSION_CLI_VERSION:-v1.20.1}/fission-${FISSION_CLI_VERSION:-v1.20.1}-linux-amd64
+        RUN chmod +x fission && mv fission /usr/local/bin/
+        USER ${DOCKER_UGNAME:-root}
+    entrypoint: fission
+
+
+  # https://github.com/kubernetes/kompose/blob/main/docs/installation.md#github-release
+  kompose:
+    <<: *base
+    depends_on: ['k8s']
+    hostname: k8s:kompose
+    build:
+      tags: ['k8s:kompose']
+      context: .
+      dockerfile_inline: |
+        FROM k8s:base
+        USER root 
+        RUN curl -L https://github.com/kubernetes/kompose/releases/download/${KOMPOSE_CLI_VERSION:-v1.33.0}/kompose-linux-amd64 -o /usr/bin/kompose
+        RUN chmod ugo+x /usr/bin/kompose
+        USER ${DOCKER_UGNAME:-root}
+    entrypoint: kompose
+  
+  # https://argo-workflows.readthedocs.io/en/latest/walk-through/argo-cli/
+  # FIXME: pin version
+  argo:
+    <<: *base 
+    depends_on: ['k8s']
+    hostname: k8s:argo
+    build:
+      tags: ['k8s:argo']
+      context: . 
+      dockerfile_inline: |
+        FROM quay.io/argoproj/argocli:${ARGO_CLI_VERSION:-v3.4.17} as argo
+        FROM k8s:base 
+        COPY --from=argo /bin/argo /bin/argo
+    entrypoint: argo 
+  
+  # https://github.com/txn2/kubefwd
+  kubefwd:
+    <<: *base 
+    depends_on: ['k8s']
+    hostname: k8s:kubefwd
+    user: root 
+    build:
+      tags: ['k8s:kubefwd']
+      context: . 
+      dockerfile_inline: |
+        FROM txn2/kubefwd:${KUBEFWD_VERSION:-1.22.5} as builder 
+        FROM k8s:base
+        COPY --from=builder /kubefwd /usr/bin/kubefwd
+    entrypoint: kubefwd
+    volumes: 
+      # Same as the base volumes, plus /etc/hosts for kubefwd to sync DNS
+      - /etc/hosts:/etc/hosts:rw
+      - ${PWD}:${workspace:-/workspace}
+      - ${DOCKER_SOCKET:-/var/run/docker.sock}:${DOCKER_SOCKET:-/var/run/docker.sock}
+      - ${HOME}/.kube:/home/${DOCKER_UGNAME:-root}/.kube
+      - ${HOME}/.cache:/home/${DOCKER_UGNAME:-root}/.cache
+      - ${HOME}/.config/helm:/home/${DOCKER_UGNAME:-root}/.config/helm
+      - ${HOME}/.local:/home/${DOCKER_UGNAME:-root}/.local:ro
+      - "${KUBECONFIG:-~/.kube/config}:/home/${DOCKER_UGNAME:-root}/.kube/config"
+
+  # https://k3d.io/
+  k3d:
+    <<: *base
+    depends_on: ['k8s']
+    hostname: k8s:k3d
+    build:
+      tags: ['k8s:k3d']
+      context: .
+      dockerfile_inline: |
+        FROM k8s:base
+        USER root
+        RUN curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh \
+          | TAG=${K3D_VERSION:-v5.6.3} bash
+        USER ${DOCKER_UGNAME:-root}
+    entrypoint: k3d
+  
+  # https://github.com/jesseduffield/lazydocker
+  lazydocker:
+    <<: *base
+    depends_on: ['k8s']
+    hostname: k8s:lazydocker
+    build:
+      tags: ['k8s:lazydocker']
+      context: .
+      dockerfile_inline: |
+        FROM k8s:base
+        USER root
+        RUN wget https://github.com/jesseduffield/lazydocker/releases/download/v${LAZY_DOCKER_CLI_VERSION:-0.23.1}/lazydocker_${LAZY_DOCKER_CLI_VERSION:-0.23.1}_Linux_x86_64.tar.gz 
+        RUN tar -zxvf lazydocker*
+        RUN mv lazydocker /usr/bin && rm lazydocker*
+        USER ${DOCKER_UGNAME:-root}
+    entrypoint: lazydocker
+
+  # https://github.com/kubernetes-sigs/kind
+  kind: 
+    hostname: "k8s:kind"
+    build:
+      tags: ['k8s:kind']
+      context: .
+      dockerfile_inline: |
+        FROM debian
+        RUN apt-get update && apt-get install -y curl
+        RUN [ $(uname -m) = x86_64 ] \
+          && curl -Lo /usr/bin/kind https://kind.sigs.k8s.io/dl/${KIND_CLI_VERSION:-v0.23.0}/kind-$(uname)-amd64 \
+          && chmod o+x /usr/bin/kind
+    entrypoint: /usr/bin/kind
+
+  # https://k9scli.io/
+  k9s:
+    <<: *base 
+    hostname: k8s:k9s
+    build:
+      tags: ['k8s:k9s']
+      dockerfile_inline: |
+        # Needs bugfix for missing 'infocmp' in latest release?
+        FROM derailed/k9s:${K9S_VERSION:-v0.32.4}
+        RUN apk add ncurses
+        RUN which infocmp
+    tty: true
+    network_mode: host
+    entrypoint: k9s
+  
+  # https://github.com/rancher/cli
+  rancher:
+    <<: *base 
+    depends_on: ['k8s']
+    hostname: k8s:rancher
+    build:
+      tags: ['k8s:rancher']
+      context: . 
+      dockerfile_inline: |
+        FROM rancher/cli2:${RANCHER_CLI_VERSION:-v2.8.4} as rancher
+        FROM k8s:base 
+        COPY --from=rancher /usr/bin/rancher /usr/bin/
+    entrypoint: /usr/bin/rancher 
+
+  # promtool: https://prometheus.io/docs/prometheus/latest/command-line/promtool/
+  promtool:
+    <<: *base 
+    depends_on: ['k8s']
+    hostname: k8s:promtool
+    build:
+      tags: ['k8s:promtool']
+      context: . 
+      dockerfile_inline: |
+        FROM prom/prometheus:${PROMETHEUS_CLI_VERSION:-v2.52.0} as prom
+        FROM k8s:base 
+        COPY --from=prom /bin/promtool /usr/bin/
+        USER ${DOCKER_UGNAME:-root}
+    entrypoint: promtool
+
+  # yq:
+  #   # NB: included in base, but this option is smaller
+  #   image: mikefarah/yq:${YQ_VERSION:-4.43.1}
+
+  # jq:
+  #   # NB: included in base, but this option is smaller
+  #   image: ghcr.io/jqlang/jq:${JQ_VERSION:-1.7.1}
+  
+  
+  # https://github.com/tsub/docker-graph-easy
+  graph-easy:
+    image: tsub/graph-easy
+    working_dir: ${workspace:-/workspace} 
+    volumes: 
+      - ${PWD}:${workspace:-/workspace}
+
+  # https://github.com/elo-enterprises/k8s-tools#embedded-tui
+  dind: &dind
+    <<: *base 
+    depends_on: ['k8s']
+    hostname: k8s:dind
+    build:
+      tags: ['k8s:dind']
+      context: . 
+      dockerfile_inline: |
+        FROM k8s:base as base
+        FROM compose.mk:dind_base 
+        COPY --from=base \
+          /usr/bin/kube* /usr/bin/helm* \
+          /usr/bin/krew /usr/bin/gum \
+          /usr/bin 
+        USER ${DOCKER_UGNAME:-root}
+    entrypoint: bash
+  
+  # https://docs.ansible.com/ansible/latest/collections/kubernetes/core/k8s_module.html
+  ansible:
+    <<: *base
+    hostname: k8s:ansible
+    tty: true 
+    build: 
+      context: .
+      tags: ['k8s:ansible']
+      dockerfile_inline: |
+        # Ansible has no official images and doesn't work well on alpine :(
+        # So kubectl/helm versions here are chosen to match current alpine k8s:base,
+        # but they don't track automatically if things are updated!
+        # FROM ${ANSIBLE_BASE:-${PYTHON_BASE:-python:3.11-slim-bookworm}}
+        FROM k8s:dind
+        # COPY --from=builder /opt/bitnami/kubectl/bin/kubectl /usr/bin
+        #   /bin/bash /usr/bin/make \
+        #     /usr/bin/kube* /usr/bin/helm* \
+        #       /usr/bin/gum /usr/bin
+        USER root
+        RUN apt-get update && apt-get install -y python3 python3-pip
+        RUN pip3 install --break-system-packages ansible==${ANSIBLE_VERSION:-10.1.0}
+        RUN ansible-galaxy collection install kubernetes.core
+        RUN pip install kubernetes --break-system-packages
+        RUN pip freeze|grep kuber
+        # RUN curl -LO https://dl.k8s.io/release/${KUBECTL_CLI_VERSION:-v1.30.0}/bin/linux/amd64/kubectl && mv kubectl /usr/bin
+        # RUN wget https://get.helm.sh/helm-${HELM_CLI_VERSION:-v3.14.4}-linux-amd64.tar.gz && tar -zxvf helm* && mv */helm /usr/bin
+        USER ${DOCKER_UGNAME:-root}
+
+  # https://github.com/elo-enterprises/k8s-tools#embedded-tui
+  tui: 
+    <<: *base
+    hostname: k8s:tui
+    environment:
+      <<: *base_environment
+      CMK_DIND: "1"
+      KUBECONFIG: "${KUBECONFIG:-~/.kube/config}"
+      TMUX: "${TUI_TMUX_SOCKET:-/workspace/tmux.sock}"
+    image: k8s:tui
+    build:
+      tags: ['k8s:tui']
+      context: . 
+      dockerfile_inline: |
+        FROM k8s:dind as dind_base
+        FROM compose.mk:tux
+        COPY --from=dind_base \
+          /usr/bin/kube* /usr/bin/helm* \
+          /usr/bin/krew /usr/bin/gum \
+          /usr/bin 
+        USER root 
+        RUN apt-get update && apt-get install -y graphviz imagemagick
+        USER ${DOCKER_UGNAME:-root}
+
+# https://github.com/kdash-rs/kdash?tab=readme-ov-file
