@@ -53,9 +53,6 @@ test: e2e-test integration-test smoke-test tui-test
 
 docs: docs.jinja #docs.mermaid
 
-mkdocs: mkdocs.build mkdocs.serve
-mkdocs.build build.mkdocs:; mkdocs build
-mkdocs.serve serve:; mkdocs serve
 
 normalize: 
 
@@ -122,34 +119,45 @@ etest e2e-test: test-suite/e2e/all
 	@# by walking through cluster-lifecycle stuff inside a 
 	@# project-local kubernetes cluster.
 
-# lme-test: test-suite/lme
-# 	@# Logging/Metrics/Events demo.  FIXME
-# mad: mad/all 
-# mad/%:; set -x && make test-suite/mad-science/${*}
-# 	@# Polyglot tests, mad-science, and other bad ideas that
-# 	@# allow make-targets to be written in real programming languages,
-# 	@# embedding docker-containers in make-defines, and quickly mapping 
-# 	@# containerized APIs onto make-targets.
-
 ## BEGIN: Documentation related targets
 ##
-docs.deploy:
-	#[ `git rev-parse --abbrev-ref HEAD` == "docs" ] || (echo this isnt docs branch; exit 1) \
-	mkdocs gh-deploy --config-file mkdocs.yml --remote-branch docs
+define docs.builder.composefile
+services:
+  docs.builder: &base
+    hostname: docs-builder
+    build:
+      context: .
+      dockerfile_inline: |
+        FROM python:3.9.21-bookworm
+        RUN pip3 install --break-system-packages pynchon==2024.7.20.14.38 mkdocs==1.5.3 mkdocs-autolinks-plugin==0.7.1 mkdocs-autorefs==1.0.1 mkdocs-material==9.5.3 mkdocs-material-extensions==1.3.1 mkdocstrings==0.25.2
+        RUN apt-get update && apt-get install -y tree jq
+    entrypoint: bash
+    working_dir: /workspace
+    volumes:
+      - ${PWD}:/workspace
+      - ${DOCKER_SOCKET:-/var/run/docker.sock}:/var/run/docker.sock
+endef 
+$(eval $(call compose.import.def,  ▰,  TRUE, docs.builder.composefile))
+.mkdocs.build:; set -x && (make docs && mkdocs build --clean --verbose && tree site) ; find site docs|xargs chmod o+rw; ls site/index.html
+docs.build: docs.builder/build ▰/docs.builder/.mkdocs.build
+mkdocs: mkdocs.build mkdocs.serve
+mkdocs.build build.mkdocs:; mkdocs build
+mkdocs.serve serve:; mkdocs serve --dev-addr 0.0.0.0:8000
+
+docs: docs.jinja #docs.mermaid
 
 docs.jinja:
-	@#
-	find docs|grep .j2 | sort | sed 's/docs\///g' | grep -v macros.j2 \
-	| xargs -I% sh -x -c "make docs.jinja/%"
+	@# Render all docs with jinja
+	find docs | grep .j2 | sort | sed 's/docs\///g' | grep -v macros.j2 \
+	| xargs -I% sh -x -c "make docs.jinja/% || exit 255"
 
 docs.jinja/%: 
-	@# Render docs twice to use includes, then get the ToC 
-	true \
+	@# Render the named docs twice (once to use includes, then to get the ToC)
+	pynchon --version \
 	&& $(call io.mktemp) && first=$${tmpf} \
-	&& set -x && pynchon jinja render docs/${*} -o $${tmpf} --preview \
+	&& set -x && pynchon jinja render docs/${*} -o $${tmpf} --print \
 	&& dest="docs/`dirname ${*}`/`basename -s .j2 ${*}`" \
 	&& [ "${*}" == "README.md.j2" ] && mv $${tmpf} README.md || mv $${tmpf} $${dest}
-
 docs.mermaid:; pynchon mermaid apply
 
 docs.mmd: docs.mermaid

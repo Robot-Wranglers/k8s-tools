@@ -6,7 +6,7 @@
 #   defaults for volumes, includes fixes for root-container permissions, allows 
 #   for version-overrides without editing[2], etc.
 #
-# DOCS: https://github.com/elo-enterprises/k8s-tools#features
+# DOCS: https://robot-wranglers.github.io/k8s-tools#features
 # LATEST: https://robot-wranglers.github.io/k8s-tools/tree/master/k8s-tools.yml
 #
 # MANIFEST:
@@ -93,14 +93,6 @@ services:
       # - ${HOME}/.aws:/home/${DOCKER_UGNAME:-root}/.aws
     tty: true 
   
-  # https://github.com/charmbracelet/gum
-  # gum:
-  #   <<: *base
-  #   image: k8s:gum
-  #   hostname: k8s:gum
-  #   entrypoint: gum
-  #   tty: false
-
   # https://helm.sh/docs/
   helm:
     <<: *base
@@ -391,15 +383,6 @@ services:
         COPY --from=prom /bin/promtool /usr/bin/
         USER ${DOCKER_UGNAME:-root}
     entrypoint: promtool
-
-  # yq:
-  #   # NB: included in base, but this option is smaller
-  #   image: mikefarah/yq:${YQ_VERSION:-4.43.1}
-
-  # jq:
-  #   # NB: included in base, but this option is smaller
-  #   image: ghcr.io/jqlang/jq:${JQ_VERSION:-1.7.1}
-  
   
   # https://github.com/tsub/docker-graph-easy
   graph-easy:

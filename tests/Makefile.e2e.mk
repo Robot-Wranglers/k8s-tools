@@ -103,7 +103,7 @@ deploy.test_harness: ▰/k8s/self.test_harness.deploy
 # Private targets with the low-level details for what to do in tool containers. 
 # You can expand this to include usage of `kustomize`, etc. Volumes are already setup,
 # so you can `kubectl apply` from the filesystem.  You can also call anything documented 
-# in the API[1] https://github.com/elo-enterprises/k8s-tools/tree/master/docs/api/#k8smk.
+# in the API[1] https://github.com/robot-wranglers/k8s-tools/tree/master/docs/api/#k8smk.
 self.cluster.deploy_helm_example: 
 	@# Idempotent version of a helm install.
 	@# Commands are inlined directly below for clarity, 

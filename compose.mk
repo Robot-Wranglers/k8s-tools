@@ -186,7 +186,8 @@ endif
 
 # IMPORTANT: this is the way to safely call `make` recursively. 
 # It determines MAKE and MAKEFILE_LIST are not reliable!
-make=make ${MAKE_FLAGS} $(addprefix -f,$(shell echo "${MAKE_CLI}"|awk '{for(i=1;i<=NF;i++)if($$i=="-f"&&i+1<=NF){print$$(++i)}else if($$i~/^-f./){print substr($$i,3)}}' | xargs))
+makefile_list=$(addprefix -f,$(shell echo "${MAKE_CLI}"|awk '{for(i=1;i<=NF;i++)if($$i=="-f"&&i+1<=NF){print$$(++i)}else if($$i~/^-f./){print substr($$i,3)}}' | xargs))
+make=make ${MAKE_FLAGS} ${makefile_list}
 
 # Stream constants
 stderr:=/dev/stderr
@@ -320,8 +321,9 @@ docker.images.filter=docker images --filter reference=${1} --format "{{.Reposito
 # External tool used for parsing Makefile metadata
 PYNCHON_CLI_VERSION=baf56b7
 pynchon=$(trace_maybe) && ${pynchon.run}
-pynchon.run=python -m pynchon.util.makefile
-
+# pynchon.run=python -m pynchon.util.makefile
+pynchon.docker=${docker.run.base} -v `pwd`:/workspace -w/workspace --entrypoint python robotwranglers/pynchon:$${PYNCHON_VERSION:-baf56b7} 
+pynchon.run:=$(shell which pynchon >/dev/null 2>/dev/null && echo python || echo "${pynchon.docker}") -m pynchon.util.makefile
 # Macros for use with jq/yq/jb, using local tools if available and falling back to dockerized versions
 jq.docker=${docker.run.base} -e key=$${key:-} -v `pwd`:/workspace -w/workspace ghcr.io/jqlang/jq:$${JQ_VERSION:-1.7.1}
 yq.docker=${docker.run.base} -e key=$${key:-} -v `pwd`:/workspace -w/workspace mikefarah/yq:$${YQ_VERSION:-4.43.1}
@@ -551,7 +553,7 @@ compose.validate/%:
 ## This interface is deliberately minimal, focusing on verbs like 'stop' and 'stat' more than verbs like 'build' and 'run'. That's because containers that are managed by docker compose are preferred, but some ability to work with inlined Dockerfiles for simple use-cases is supported. See stream.pygmentize for an example.
 ##
 ## DOCS:
-##   * `[1]`: https://github.com/robot-wranglers/compose.mk/docs/api#api-docker
+##   * `[1]`: https://robot-wranglers.github.io/compose.mk/api#api-docker
 ##
 ##
 ##░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
@@ -671,20 +673,21 @@ docker.from.def/% docker.build.def/%:
 	@#   make docker.from.def/<my_def_name>
 	@#
 	@# REFS:
-	@#  [1]: https://github.com/robot-wranglers/compose.mk/blob/master/tests/Makefile.mad-science.mk
+	@#  [1]: https://robot-wranglers.github.io/compose.mk/#demos
 	@#
 	def_name="Dockerfile.${*}" \
 	&& tag="compose.mk:$${tag:-${*}}" \
 	&& header="${GLYPH_DOCKER} docker.from.def ${sep} ${dim_cyan}${ital}$${def_name}${no_ansi_dim}" \
 	&& $(call log.trace, $${header} ) \
 	&& $(trace_maybe) \
-	&& export builder=none \
+	&& $(call io.mktemp) \
+	&& ${make} mk.def.read/$${def_name} >> $${tmpf} \
 	&& case `${make} docker.def.is.cached/${*}` in \
 		yes) $(call log.trace,${GLYPH_DOCKER}${no_ansi_dim}  Tag ${bold}${ital}$${tag}${no_ansi_dim} is ready); ;; \
 		no) ( $(call log.trace,${GLYPH_DOCKER}${no_ansi_dim}  Tag ${bold}${ital}$${tag}${no_ansi_dim} needs building) \
 				&& case $${quiet:-1} in \
-					1) ${make} mk.def.read/$${def_name}| tag=$${tag} ${make} docker.build.quiet/- ; ;; \
-					*) ${make} mk.def.read/$${def_name}| tag=$${tag} ${make} docker.build/- ; ;; \
+					1) cat $${tmpf} | tag=$${tag} ${make} docker.build.quiet/- ; ;; \
+					*) cat $${tmpf} | ${stream.peek} | tag=$${tag} ${make} docker.build/- ; ;; \
 				esac \
 				&& $(call log.trace,$${header} ${sep} ${no_ansi_dim} Built ok. (quiet=${bold}${ital}$${quiet:-1}${no_ansi_dim})) \
 			); ;; \
@@ -742,15 +745,7 @@ docker.commander:
 	@# Automation also ensures that lazydocker always starts with the "statistics" tab open.
 	@#
 	$(call log, ${GLYPH_DOCKER} ${@} ${sep} ${no_ansi_dim}Opening commander TUI for docker)
-	TUX_CMDR_PANE_COUNT=3 \
-		TUX_LAYOUT_CALLBACK=.${@}.layout \
-			${make} tux.commander/.tux.widget.lazydocker
-.docker.commander.layout:
-	geometry="${GEO_DOCKER}" \
-	${make} \
-		.tux.commander.layout \
-		.tux.pane/2/flux.apply/docker.stat,io.envp/DOCKER \
-		.tux.pane/1/.tux.widget.img
+	geometry="${GEO_DOCKER}" ${make} tux.open/.tux.widget.lazydocker,flux.wrap/docker.stat:io.envp/DOCKER,.tux.widget.img
 
 docker.network.panic:; docker network prune -f
 	@# Runs 'docker network prune' for the entire system.
@@ -782,7 +777,7 @@ docker.run/%:
 	@#
 	$(trace_maybe) \
 	&& entrypoint=make \
-		cmd="${MAKE_FLAGS} -f ${MAKEFILE} ${*}" \
+		cmd="${MAKE_FLAGS} ${makefile_list} ${*}" \
 			img=$${img} ${make} docker.run.sh
 docker.run.image/%:
 	@# Runs the given commands in the given image.
@@ -943,15 +938,15 @@ docker.volume.panic:; docker volume prune -f
 ## END: docker.* targets
 ## BEGIN: io.* targets
 ##
-## The `io.*` namespace has misc helpers for working with input/output, including utilities
-## for working with temp files and showing output to users.  User-facing output leverages 
-## charmbracelet utilities like gum[1] and glow[2].  Generally we use tools directly if they 
-## are available, falling back to utilities in containers.
+## The `io.*` namespace has misc helpers for working with input/output, including
+## utilities for working with temp files and showing output to users.  User-facing 
+## output leverages  charmbracelet utilities like gum[1] and glow[2].  Generally we 
+## use tools directly if they are available, falling back to utilities in containers.
 ##
-## See also `io.print.*` and `stream.pygmentize` for simpler versions of some of these features.
+## See also `io.print.*` and `stream.pygmentize` for simpler versions of some features.
 ##
 ## DOCS:
-##  * [0] https://github.com/robot-wranglers/compose.mk/docs/api#api-io
+##  * [0] https://robot-wranglers.github.io/compose.mk/api#api-io
 ##  * [1] https://github.com/charmbracelet/gum
 ##  * [1] https://github.com/charmbracelet/glow
 ##
@@ -960,7 +955,7 @@ docker.volume.panic:; docker volume prune -f
 io.gum.div_style:=--border double --align center --width $${width:-$$(echo "x=$$(tput cols) - 5;if (x < 0) x=-x; default=30; if (default>x) default else x" | bc)}
 io.gum.default_style:=--border double --foreground 2 --border-foreground 2
 
-charm.glow:=docker run -i charmcli/glow -s dracula
+charm.glow:=docker run -i charmcli/glow:v1.5.1 -s dracula
 
 io.gum.style=label="${1}" make io.gum.style
 
@@ -1013,12 +1008,6 @@ io.gum.style/%:; ( width=`echo \`tput cols\` / ${*} | bc` ${make} io.gum.style )
 	@#
 	@# EXAMPLE: (A half-width labeled divider)
 	@#   label=... ./compose.mk io.gum.style/2
-
-##
-## ----------------------------------------------------------------------------
-## DOCS:
-##   [1] https://github.com/robot-wranglers/compose.mk/docs/api#api-io
-##░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 
 # Helper for working with temp files.  Returns filename,
 # and uses 'trap' to handle at-exit file-deletion automatically.
@@ -1243,8 +1232,9 @@ io.time.wait/% io.wait/%:
 ## END: io.* targets
 ## BEGIN: mk.* targets
 ##
-## The 'mk.*' targets are meta-tooling that include various extensions to `make` itself.  
-## 
+## The 'mk.*' targets are meta-tooling that include various extensions to 
+## `make` itself, including some support for reflection and runtime changes.
+##
 ## A rough guide to stuff you can find here:
 ## 
 ## * `mk.supervisor.*` for signals and supervisors
@@ -1253,9 +1243,8 @@ io.time.wait/% io.wait/%:
 ## * `mk.help.*` for help-generation
 ##
 ## For more details: 
-## * Full API Docs: https://github.com/robot-wranglers/compose.mk/docs/api#api-mk
-## * Signals & Supervisors: https://github.com/robot-wranglers/compose.mk/#signals-and-supervisors
-## * Mad Science Test-Suite: https://github.com/robot-wranglers/compose.mk/tests/Makefile.mad-science.mk
+## * Full API Docs: https://robot-wranglers.github.io/compose.mk/api#api-mk
+## * Signals & Supervisors: https:/robot-wranglers.github.io/compose.mk/signals
 ##
 ##░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 
@@ -1728,9 +1717,9 @@ mk.vars:; echo "${.VARIABLES}\n" | sed 's/ /\n/g' | sort
 ## ----------------------------------------------------------------------------
 ##
 ## DOCS:
-##   * `[1]:` https://github.com/robot-wranglers/compose.mk/docs/api#api-flux
-##   * `[1]:` https://github.com/robot-wranglers/compose.mk/docs/api#api-flux
-##   * `[1]:` https://github.com/robot-wranglers/compose.mk/docs/api#api-flux
+##   * `[1]:` https://robot-wranglers.github.io/compose.mk/api#api-flux
+##   * `[1]:` https://robot-wranglers.github.io/compose.mk/api#api-flux
+##   * `[1]:` https://robot-wranglers.github.io/compose.mk/api#api-flux
 ##░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 
 
@@ -2359,9 +2348,8 @@ flux.try.except.finally/%:
 ## ----------------------------------------------------------------------------
 ## DOCS:
 ## 
-##   * `[1]:` https://github.com/robot-wranglers/compose.mk/docs/api#api-stream
+##   * `[1]:` https://robot-wranglers.github.io/compose.mk/docs/api#api-stream
 ##   * `[2]:` https://github.com/h4l/json.bash
-##   * `[1]:` https://github.com/robot-wranglers/compose.mk/docs/api#api-stream
 ##░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 
 stream.stdin=cat /dev/stdin
@@ -2390,7 +2378,7 @@ stream.strip:
 	@#
 	cat ${stdin} | awk '{gsub(/[\t\n]/, ""); gsub(/ +/, " "); print}' ORS=''
 
-stream.ini.pygmentize:; cat ${stdin} | lexer=ini make stream.pygmentize
+stream.ini.pygmentize:; cat ${stdin} | lexer=ini ${make} stream.pygmentize
 	@# Highlights input stream using the 'ini' lexer.
 
 stream.csv.pygmentize:
@@ -2514,7 +2502,7 @@ stream.pygmentize:
 	&& src="$${src} img=${@} ${make} docker.from.def/${@} mk.docker.run.sh" \
 	&& [ -p ${stdin} ] && ${stream.stdin} | eval $${src} || eval $${src}
 
-stream.json.pygmentize:; lexer=json make stream.pygmentize
+stream.json.pygmentize:; lexer=json ${make} stream.pygmentize
 	@# Syntax highlighting for the JSON on stdin.
 	@#
 stream.indent.to.stderr=( ${stream.stdin} | ${stream.indent} | ${stream.to.stderr} )
@@ -2581,6 +2569,8 @@ stream.to.stderr stream.preview:; ${stream.to.stderr}
 	@# Sends input stream to stderr.
 	@# Unlike 'stream.peek', this does not pass on the input stream.
 
+stream.yaml.pygmentize=lexer=yaml ${make} stream.pygmentize
+
 ##░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 ## END: stream.* targets
 ## BEGIN: tux.* targets
@@ -2640,17 +2630,7 @@ tui.demo tux.demo:
 	@#   * `[1]`: https://github.com/ChrisBuilds/terminaltexteffects
 	@#
 	$(call tux.log, tui.demo ${sep} ${dim}Starting demo) \
-	&& TUX_LAYOUT_CALLBACK=.${@}.layout \
-		TUX_CMDR_PANE_COUNT=4 \
-			${make} tux.commander
-
-.tui.demo.layout .tux.demo.layout: 
-	$(call tux.log, tui.demo.layout ${sep} ${dim}Laying out panes) \
-	&& ${make} .tux.layout.spiral \
-		.tux.pane/0/flux.apply/.tte/${CMK_SRC} \
-		.tux.pane/1/flux.apply/.tte/${CMK_SRC} \
-		.tux.pane/2/flux.apply/.tte/${CMK_SRC} \
-		.tux.pane/3/flux.apply/.tte/${CMK_SRC}
+	&& layout=spiral ${make} tux.open/.tte/${CMK_SRC},.tte/${CMK_SRC},.tte/${CMK_SRC},.tte/${CMK_SRC}
 
 tux.pane/%:
 	@# Sends the given make-target into the given pane.
@@ -2693,24 +2673,23 @@ tux.require: ${CMK_COMPOSE_FILE} compose.validate.quiet/${CMK_COMPOSE_FILE}
 			&& exit 0 ) \
 		)
 
-tux.commander: tux.require
-	@# Starts a tmux layout defaulting to 4 panes, using the "commander" layout callback.
-	@# See `.tux.commander.layout` for more details.
-	@#
-	@# USAGE:
-	@#  ./compose.mk tux.commander
-	@#
-	${make} tux.mux.count/$${TUX_CMDR_PANE_COUNT:-4}
-
-tux.commander/%:
-	@# A 4-pane session using the commander layout, 
-	@# proxying the given targets into the main pane.
-	@# See `.tux.commander.layout` for more details.
-	@#
-	@# EXAMPLE: (Runs 'io.env' target in the primary pane)
-	@#   ./compose.mk tux.commander/io.env
-	@#
-	tux_commander_targets="${*}" ${make} tux.commander
+# tux.commander: tux.require
+# 	@# Starts a tmux layout defaulting to 4 panes, using the "commander" layout callback.
+# 	@# See `.tux.commander.layout` for more details.
+# 	@#
+# 	@# USAGE:
+# 	@#  ./compose.mk tux.commander
+# 	@#
+# 	${make} tux.mux.count/$${TUX_CMDR_PANE_COUNT:-4}
+# tux.commander/%:
+# 	@# A 4-pane session using the commander layout, 
+# 	@# proxying the given targets into the main pane.
+# 	@# See `.tux.commander.layout` for more details.
+# 	@#
+# 	@# EXAMPLE: (Runs 'io.env' target in the primary pane)
+# 	@#   ./compose.mk tux.commander/io.env
+# 	@#
+# 	tux_commander_targets="${*}" ${make} tux.commander
 
 tux.open/%: tux.require
 	@# Opens the comma-separated targets in tmux panes.
@@ -2757,7 +2736,7 @@ tux.callback/%:
 	@#   layout=.. ./compose.mk tux.spiral/<t1>,<t2>
 	@#
 	pane_targets=`printf "${*}" | ./compose.mk stream.comma.to.nl | nl -v0 | awk '{print ".tux.pane/" $$1 "/" substr($$0, index($$0,$$2))}'` \
-	&& pane_targets=".tux.layout.$${layout} $${pane_targets}" \
+	&& pane_targets=".tux.layout.$${layout} .tux.geo.set $${pane_targets}" \
 	&& layout="flux.apply/$${pane_targets}" \
 	&& layout=`echo $$layout|${stream.space.to.comma}` \
 	&& $(call log.trace, tux.callback ${sep} ${no_ansi_dim}Generated layout callback:\n  $${layout}) \
@@ -2859,6 +2838,7 @@ tux.mux.detach/%:
 		-e TUI_INIT_CALLBACK="$${TUI_INIT_CALLBACK}" \
 		-e TUX_LAYOUT_CALLBACK="$${TUX_LAYOUT_CALLBACK}" \
 		-e TUI_SVC_STARTED=1 \
+		-e geometry=$${geometry:-} \
 		-e reattach="$${reattach}" \
 		-e k8s_commander_targets="$${k8s_commander_targets:-}" \
 		-e tux_commander_targets="$${tux_commander_targets:-}" \
@@ -3126,12 +3106,15 @@ endef
 	@# USAGE:
 	@#   geometry=... ./compose.mk .tux.geo.set
 	@#
-	true \
-	&& $(call log.part1, ${GLYPH_TUI} ${@} ${sep} ${dim}Setting geometry) \
-	&& tmux select-layout "$${geometry}" \
-	; case $$? in \
-		0) $(call log.part2, ${dim_green}geometry ok); ;; \
-		*) $(call log.part2, ${red}error setting geometry); ;; \
+	case "$${geometry:-}" in \
+		"") $(call log.trace,${GLYPH_TUI} ${@} ${sep} ${dim}No geometry provided) ;; \
+		*) ( \
+			$(call log.part1, ${GLYPH_TUI} ${@} ${sep} ${dim}Setting geometry) \
+			&& tmux select-layout "$${geometry}" \
+			; case $$? in \
+				0) $(call log.part2, ${dim_green}geometry ok); ;; \
+				*) $(call log.part2, ${red}error setting geometry); ;; \
+			esac );; \
 	esac 
 # ${GLYPH_TUI} ${@} ${sep} ${red}Error setting geometry:${no_ansi_dim}\n `printf "$${geometry}"|fmt -w 20|${stream.indent}`)
 
@@ -3499,7 +3482,7 @@ define compose.get_services
 endef
 
 # Macro to create all the targets for a given compose-service.
-# See docs @ https://github.com/robot-wranglers/compose.mk/#composemk-api-dynamic
+# See docs @ https://robot-wranglers.github.io/compose.mk/bridge
 define compose.create_make_targets
 $(eval compose_service_name := $1)
 $(eval target_namespace := $2)
@@ -3889,7 +3872,7 @@ yq:
 	&& cmd=$${cmd:-$${after:-.}} \
 	&& dcmd="${yq.run.pipe} $${cmd}" \
 	&& ([ -p ${stdin} ] && dcmd="cat ${stdin} | $${dcmd}" || true) \
-	&& eval $${dcmd}; ${make} mk.interrupt
+	&&  $(call mk.yield2, $${dcmd})
 
 jq:
 	@# A wrapper for jq.  
@@ -3897,7 +3880,7 @@ jq:
 	&& cmd=$${cmd:-$${after:-.}} \
 	&& dcmd="${jq.run.pipe} $${cmd}" \
 	&& ([ -p ${stdin} ] && dcmd="cat ${stdin} | $${dcmd}" || true) \
-	&& eval $${dcmd}; ${make} mk.interrupt
+	&& $(call mk.yield2, $${dcmd})
 
 jb jb.pipe:
 	@# An interface to `jb`[1] tool for building JSON from the command-line.
@@ -3916,7 +3899,7 @@ jb jb.pipe:
 	@#
 	@# REFS:
 	@#   * `[1]`: https://github.com/h4l/json.bash
-	@#   * `[2]`: https://github.com/robot-wranglers/compose.mk/tree/master/#signals-and-supervisors
+	@#   * `[2]`: https://robot-wranglers.github.io/compose.mk/signals
 	@#
 	case $$(test -p /dev/stdin && echo pipe) in \
 		pipe) sh ${dash_x_maybe} -c "${jb.run} `${stream.stdin}`"; ;; \

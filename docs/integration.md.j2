@@ -1,15 +1,16 @@
 ## Integration With Your Project
 
-The k8s-tools suite can be integrated with your project in a few ways, either with some kind of [global compose file and global aliases](#tools-via-simple-aliases) (*not recommended*), or with [a more project-based approach](#embedding-tools-with-makefiles).  But first, you might like to check out the [compatibility notes](#compatibility-notes).  
+The k8s-tools suite can be integrated with your project in a few ways, either with some kind of [global compose file and global aliases](#tools-via-simple-aliases) (*not recommended*), or with [a more project-based approach](#embedding-tools-with-makefiles).  
 
+See also the [compatibility notes from compose.mk docs]({{jinja.vars.composemk_docs_url}}/integration#compatibility-notes).  
 
-
+{#
 ### Compatibility Notes
 
 Platforms used in development include modern docker (say `25+`), make (`3.8+`), and bash `(~5`) on both Linux and MacOS. Testing in github-actions only uses Linux, and won't try every possible combination of versions.  
 
 In general, *the goal is to support most things you'll encounter in the wild*, including OSX, out of the box.  But you may see some of the usual problems with certain arguments to non-posix OSX default `sed` / `ps` / `xargs`, etc.  Please report issues!
-
+#}
 ### Tools Via Simple Aliases
 
 The simplest and most global way to use k8s-tools.yml is to just download it and setup shell aliases, ignoring `compose.mk` and `k8s.mk`.  Not generally recommended, since this is the least project-based, least portable thing you can do. 
@@ -92,6 +93,7 @@ self.test:
 {% endset %}
 {{integration_block}}
 
+{#
 ### Stand Alone Tools
 
 If you're not interested in custom automation that requires project-Makefile integration, some features of `compose.mk` and `k8s.mk` can be used without that.  See for example the [Loading Compose Files]({{mkdocs.site_relative_url}}/compose.mk#loading-compose-files) docs, plus the [full CLI docs]({{mkdocs.site_relative_url}}/api) for more details.
@@ -108,3 +110,4 @@ If you're really worried about this, you can always setup `k8s-tools.git` (or yo
 
 * The API for both `compose.mk` and `k8s.mk` is also approaching "frozen".
 
+#}

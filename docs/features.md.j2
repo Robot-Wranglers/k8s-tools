@@ -2,9 +2,15 @@
 
 # Features
 
+<hr style="width:100%;border-bottom:3px solid black;">
+
 ## Versioned Toolkit
 
-**[k8s-tools.yml](k8s-tools.yml)** is a docker compose file with 20+ container specifications covering popular platforming tools and other utilities for working with Kubernetes.  This file makes use of the [dockerfile_inline directive](https://docs.docker.com/compose/compose-file/build/#dockerfile_inline), plus the fact that tool-containers  *tend to involve layering really small customizations*.  Now you can version these tools explicitly, customize them if you need to, and still avoid having N Dockerfiles cluttering up your whole repository.  **All tool containers are just-in-time & on-demand,** so that having these declared in case of eventual use won't saddle you with an enormous bootstrap process.  As usual with docker-compose, containers aren't pulled until they are used, and build-when-changed mostly works as you'd expect.  Here's a quick overview of the manifest and some details about versioning:
+**[k8s-tools.yml](k8s-tools.yml)** is a docker compose file with 20+ container specifications covering popular platforming tools and other utilities for working with Kubernetes.  This file makes use of the [dockerfile_inline directive](https://docs.docker.com/compose/compose-file/build/#dockerfile_inline), plus the fact that tool-containers  *tend to involve layering really small customizations*.  
+
+Now you can version these tools explicitly, customize them if you need to, and still avoid having N Dockerfiles cluttering up your whole repository.  **All tool containers are just-in-time & on-demand,** so that having these declared in case of eventual use won't saddle you with an enormous bootstrap process.  As usual with docker-compose, containers aren't pulled until they are used, and build-when-changed mostly works as you'd expect.  
+
+Here's a quick overview of the manifest and some details about versioning:
 
 **Local parts of the tool bundle:** ([See the latest here]({{github.repo_url}}/tree/master/k8s-tools.yml))
 
@@ -28,7 +34,7 @@
 * **Upstream tool versioning is determined by the alpine-k8s base,**
   * But *k8s-tools.yml* has service-stubs for quick overrides if you need something specific.
 
--------
+<hr style="width:100%;border-bottom:3px solid black;">
 
 ## Bonus Features
 
@@ -38,14 +44,10 @@ For advanced usage of the tool containers defined in `k8s-tools.yml` it's best t
 
 **The focus for k8s-tools.yml is to stand alone with no host dependencies, not even Dockerfiles, yet provide boilerplate that's parametric enough to work pretty well across different projects without changing the compose file.**  If the default tool versions don't work for your use-cases, [k8s-tools.yml probably has an environment variable you can override]({{mkdocs.site_relative_url}}/config).
 
+{#
 -------
 
-## Toolchain Automation
-
-After you've made your whole kit portable in one swipe, you might want to focus on *driving* those tools with something that offers more structure than a shell script, and something that also *won't add to your host dependencies*.  If that sounds interesting, you might like to meet `compose.mk` and `k8s.mk`. 
-
 -------
-
 ### Automation with Compose.mk 
 
 **[compose.mk](/compose.mk)** is simultaneously a stand-alone CLI tool and an automation library for working with `make` + containers.  It defines targets and macros that can extend Make's core functionality in a variety of ways actually, but the main feature is ensuring that it's simple to work with docker-compose files and services, and docker in general.
@@ -64,9 +66,14 @@ After you've made your whole kit portable in one swipe, you might want to focus 
 
 The best way to think of compose.mk is to consider it an extension of `make` that's written in `make`.  As a single file with no external dependencies, it can in principle work as a global-install, but the emphasis is on embedding it into existing projects.  Since it doesn't depend explicitly on either `k8s-tools.yml` or `k8s.mk`, it slots comfortably into many kinds of projects that have nothing to do with kubernetes.  Beyond the docker support, there are [many other features]({{mkdocs.site_relative_url}}/compose.mk).
 
--------
+## Toolchain Automation
+#}
+
+<hr style="width:100%;border-bottom:3px solid black;">
 
 ### Automation with k8s.mk
+
+After you've made your whole kit portable in one swipe, you might want to focus on *driving* those tools with something that offers more structure than a shell script, and something that also *won't add to your host dependencies*.  If that sounds interesting, you might like to meet `compose.mk` and `k8s.mk`. 
 
 **[k8s.mk](/k8s.mk)** inherits all the *compose.mk* features, then integrates with *k8s-tools.yml*.  Both *compose.mk* and *k8s-tools.yml* files are a soft-dependency for *k8s.mk*, because the emphasis is on seamless usage of those containers.  
 

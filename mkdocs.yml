@@ -27,15 +27,11 @@ nav:
     - Integration: 'integration.md'
   - Core Components:
     - 'K8s-tools.yml': 'k8s-tools.yml.md'
-    - 'Compose.mk': 'compose.mk.md'
     - 'K8s.mk': 'k8s.mk.md'
-  - Demos:
-    - demos/cluster.md
-    - demos/platform.md
-    - demos/mad-science.md
   - API:
-    - api/compose.mk.md
-    - api/k8s.mk.md
+    - api.md
+  - Demos:
+    - 'End-to-End Cluster Lifecycle': demos/cluster-lifecycle.md
   - Other:
     - 'Configuration / Env Vars': config.md
     - limitations.md
@@ -46,6 +42,7 @@ plugins:
   - search
   - autolinks 
 
+# https://squidfunk.github.io/mkdocs-material/reference/lists/#using-definition-lists
 markdown_extensions:
   - footnotes 
   - admonition
