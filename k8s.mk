@@ -1046,8 +1046,8 @@ k9: k9s
 #░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 
 # FIXME: not dry 
-export CMK_COMPOSE_FILE=.tmp.compose.mk.yml
-export COMPOSE_EXTRA_ARGS=-f ${CMK_COMPOSE_FILE}
+# export CMK_COMPOSE_FILE=.tmp.compose.mk.yml
+# export COMPOSE_EXTRA_ARGS=-f ${CMK_COMPOSE_FILE}
 
 # Override compose.mk defaults 
 export TUI_SVC_NAME:=tui

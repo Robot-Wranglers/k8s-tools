@@ -10,18 +10,18 @@
 
 
 # Standard boilerplate for make itself, nothing to see here.
-SHELL := bash
-MAKEFLAGS=-sS --warn-undefined-variables
-.DEFAULT_GOAL=help
-.SHELLFLAGS := -euo pipefail -c
-.SUFFIXES:
+# SHELL := bash
+# MAKEFLAGS=-sS --warn-undefined-variables
+include k8s.mk
+
+.DEFAULT_GOAL := all 
+
+# .SHELLFLAGS := -euo pipefail -c
+# .SUFFIXES:
 
 # Override k8s-tools.yml service-defaults, 
 # explicitly setting the k3d version used
 export K3D_VERSION:=v5.6.3
-
-# Cluster details that will be used by k3d.
-export CLUSTER_NAME:=k8s-tools-e2e
 
 # Ensure local KUBECONFIG exists & ignore anything from environment
 export KUBECONFIG:=./fake.profile.yaml
@@ -33,9 +33,11 @@ export HELM_CHART:=examples/hello-world
 export POD_NAME?=test-harness
 export POD_NAMESPACE?=default
 
-# Include and invoke the `compose.import` macro 
-# so we have targets for k8s-tools.yml services
-include k8s.mk
+# Cluster details that will be used by k3d.
+export CLUSTER_NAME:=k8s-tools-e2e
+
+# Generate target-scaffolding from all the tool-containers
+# Full docs @ https://robot-wranglers.github.io/compose.mk/bridge/
 $(eval $(call compose.import, ▰, TRUE, k8s-tools.yml))
 
 # Default target should do everything, end to end.

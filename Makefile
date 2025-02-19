@@ -101,8 +101,6 @@ ttest tui-test: test-suite/tui/all
 	@# TUI test-suite, exercising the embedded 'compose.mk:tux'
 	@# container and various ways to automate tmux.
 	
-zonk: test-suite/smoke-test-k8s/test.ansible
-
 ttest/%:; make test-suite/tui/${*}
 stest smoke-test: test-suite/smoke-test-k8s/all test-suite/smoke-test-k8s-tools/all
 	@# Smoke-test suite, exercising the containers we built.
@@ -114,7 +112,7 @@ itest integration-test: test-suite/itest/all
 itest/%:; make test-suite/itest/${*}
 
 etest/% e2e/%:; make test-suite/e2e/${*}
-etest e2e-test: test-suite/e2e/all
+e2e etest e2e-test: test-suite/e2e/all
 	@# End-to-end tests.  This tests k8s.mk + compose.mk + k8s-tools.yml
 	@# by walking through cluster-lifecycle stuff inside a 
 	@# project-local kubernetes cluster.

@@ -184,6 +184,7 @@ services:
     <<: *base
     entrypoint: kubeconform
     hostname: k8s:kubeconform
+  
   # https://knative.dev/docs/client/install-kn/
   kn: &knative
     <<: *base
