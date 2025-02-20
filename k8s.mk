@@ -182,7 +182,7 @@ promtool.pull:
 		${PROM_URL} \
 	&& set +x \
 	&& printf "${DIM_GREEN}pulling data with curl and visualizing it${NO_ANSI}\n" > /dev/stderr \
-	&& tmpf=`make io.mktemp` \
+	&& $(call io.mktemp) \
 	&& curl -s "${PROM_URL}/api/v1/query_range" \
 		--data-urlencode "query=$${query}" \
 		--data-urlencode "start=$${before}" \
@@ -359,7 +359,7 @@ k3d.cluster.list k3d.list:
 	$(call log, ${GLYPH_K8S} ${@} ${sep}${dim} Listing clusters)
 	cmd="k3d cluster list -o json | ${jq.run} -r '.[].name'" \
 	&& (case "$${CMK_INTERNAL:-0}" in \
-		0) ${log.trace.target.rerouting} && printf "$${cmd}" | CMK_DEBUG=0 make k8s-tools/k3d/shell/pipe; ;; \
+		0) ${log.trace.target.rerouting} && printf "$${cmd}" | CMK_DEBUG=0 ${make} k8s-tools/k3d/shell/pipe; ;; \
 		*) eval $${cmd}; ;;  \
 	esac) | tr -d '\n' | ${stream.indent}
 
@@ -409,7 +409,7 @@ k3d.panic:
 	@#   ./k8s.mk k3d.panic
 	@# 
 	$(call log, ${dim}${GLYPH_K8S} ${@} ${sep} Stopping all k3d containers)
-	(make k3d.ps || echo -n) | xargs -I% bash -x -c "docker stop -t 1 %"
+	(${make} k3d.ps || echo -n) | xargs -I% bash -x -c "docker stop -t 1 %"
 
 k3d.ps:
 	@# Container names for everything that is k3d related.
@@ -497,7 +497,7 @@ k8s.graph.tui: k8s.graph.tui/all/pods
 # 	@#   ./k8s.mk k8s.graph.tui.loop/<namespace>
 # 	@# 
 # 	failure_msg="${yellow}Waiting for cluster to get ready..${no_ansi}" \
-# 	make flux.loopf/k8s.graph.tui/${*}
+# 	${make} flux.loopf/k8s.graph.tui/${*}
 
 k8s.graph.tui/%:
 	@# Previews topology for a given kubernetes <namespace>/<kind> in a way that's terminal-friendly.
@@ -649,7 +649,7 @@ k8s.namespace.wait/%:
 	&& ${make} .k8s.namespace.wait/${*} \
 	|| (\
 		${log.target.rerouting} \
-		; CMK_DEBUG=0 make k8s/dispatch/.k8s.namespace.wait/${*} \
+		; CMK_DEBUG=0 ${make} k8s/dispatch/.k8s.namespace.wait/${*} \
 	)
 
 k8s.cluster.ready k8s.ready:
@@ -671,7 +671,7 @@ k8s.cluster.ready k8s.ready:
 	&& ${make} .k8s.cluster.ready/$${KUBECONFIG} \
 	|| (\
 		${log.target.rerouting} \
-		; CMK_DEBUG=0 make k8s/dispatch/.k8s.cluster.ready/$${KUBECONFIG} \
+		; CMK_DEBUG=0 ${make} k8s/dispatch/.k8s.cluster.ready/$${KUBECONFIG} \
 	)
 
 .k8s.cluster.ready/%:
@@ -821,13 +821,13 @@ k8s.shell/%:
 				&& (${log.target.rerouting}; cat $${tmpf} \
 					| CMK_SUPERVISOR=0 pipe=yes cmd="$${cmd}" entrypoint=kubectl ${make} k8s-tools/k8s ) \
 				|| ( \
-					$(call log, ${GLYPH_K8S} k8s.shell${no_ansi_dim} // ${no_ansi}${green}$${namespace}${no_ansi_dim} // ${no_ansi}${green}${underline}$${pod_name}${no_ansi_dim} \n${cyan}[${no_ansi}${bold}kubectl${no_ansi_dim}${cyan}]${no_ansi} ${no_ansi_dim}${ital}${cmd}${no_ansi}\n${cyan_flow_left} ${dim_ital}`cat $${tmpf}|make stream.strip`) \
+					$(call log, ${GLYPH_K8S} k8s.shell${no_ansi_dim} // ${no_ansi}${green}$${namespace}${no_ansi_dim} // ${no_ansi}${green}${underline}$${pod_name}${no_ansi_dim} \n${cyan}[${no_ansi}${bold}kubectl${no_ansi_dim}${cyan}]${no_ansi} ${no_ansi_dim}${ital}${cmd}${no_ansi}\n${cyan_flow_left} ${dim_ital}`cat $${tmpf}|${make} stream.strip`) \
 					&& cat $${tmpf} | kubectl $${cmd} \
 				  ) \
 			); ;; \
 		*) \
 			[ "$${CMK_INTERNAL:-0}" = "0" ] \
-				&& ${log.target.rerouting}; (cmd="$${cmd}" entrypoint=kubectl make k8s-tools/k8s) \
+				&& ${log.target.rerouting}; (cmd="$${cmd}" entrypoint=kubectl ${make} k8s-tools/k8s) \
 				|| kubectl $${cmd}; ;; \
         esac
 k8s.wait k8s.cluster.wait: k8s.namespace.wait/all
@@ -850,7 +850,7 @@ k8s.stat.env:
 	(   (env | grep CLUSTER || true) \
 	  ; (env | grep KUBE    || true) \
 	  ; (env | grep DOCKER  || true) \
-	) | make stream.indent
+	) | ${make} stream.indent
 
 k8s.stat.cluster:
 	@# Shows cluster status.
@@ -865,19 +865,19 @@ k8s.stat.node_info:
 	@#
 	node_count=`kubectl get nodes -oname|wc -l` \
 	&& $(call log,${GLYPH_K8S} ${@} (${no_ansi}${green}$${node_count}${no_ansi_dim} total))
-	kubectl get nodes | ${io.gum.format.code}
+	kubectl get nodes
 
 k8s.stat.ns:
 	@#
 	@#
 	$(call log, ${GLYPH_K8S} ${@} ${sep} ${dim}Listing namespaces)
-	kubens | make stream.indent
+	kubens | ${make} stream.indent
 
 k8s.stat.ctx:
 	@#
 	@#
 	$(call log, ${GLYPH_K8S} ${@} ${sep} ${no_ansi_dim}Showing cluster context)
-	kubectx | make stream.indent
+	kubectx | ${make} stream.indent
 
 #░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 ## END: k8s.* targets
@@ -902,7 +902,7 @@ kubefwd.panic:
 	@#   ./k8s.mk kubefwd.panic
 	@# 
 	$(call log, ${GLYPH_K8S} ${@} ${sep}${no_ansi_dim}Killing all kubefwd containers)
-	(make kubefwd.ps || echo -n) | xargs -I% bash -x -c "docker stop -t 1 %"
+	(${make} kubefwd.ps || echo -n) | xargs -I% bash -x -c "docker stop -t 1 %"
 
 kubefwd.ps:
 	@# Container names for everything that is kubefwd related
@@ -1093,7 +1093,7 @@ k8s.commander/%:
 
 tui.help:
 	@# Shows help information for 'tui.*' targets
-	make help.private | grep -E '^(tui|[.]tui)' | uniq | sort --version-sort
+	${make} help.private | grep -E '^(tui|[.]tui)' | uniq | sort --version-sort
 
 
 tui.panic: 

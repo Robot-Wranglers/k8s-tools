@@ -69,30 +69,30 @@ test-suite/%:
 	@#
 	${make} io.print.div/${@}
 	$(trace_maybe) \
-	&& cd tests && bash ./bootstrap.sh \
+	&& set -x && cd tests \
 	&& suite="`printf "${*}"|cut -d/ -f1`" \
 	&& target="`printf "${*}"|cut -d/ -f2-`" \
 	&& cp Makefile.$${suite}.mk Makefile \
 	&& extra="$${target:$${targets:-}}" \
-	&& env -i PATH=$${PATH} HOME=$${HOME} bash ${dash_x_maybe} -c "make ${MAKE_FLAGS} -f Makefile $${extra}" 
+	&& make -f Makefile.$${suite}.mk $${extra}
 
 ttest tui-test: test-suite/tui/all
 	@# TUI test-suite, exercising the embedded 'compose.mk:tux'
 	@# container and various ways to automate tmux.
 	
 ttest/%:; make test-suite/tui/${*}
-# stest smoke-test: test-suite/smoke-test-k8s/all test-suite/smoke-test-k8s-tools/all
-# 	@# Smoke-test suite, exercising the containers we built.
-# 	@# This just covers the compose file at k8s-tools.yml, ignoring Makefile integration
-
-etest/% e2e/%:; make test-suite/e2e/${*}
-e2e etest e2e-test: test-suite/e2e/all
+etest e2e e2e-test:
 	@# End-to-end tests.  This tests k8s.mk + compose.mk + k8s-tools.yml
 	@# by walking through cluster-lifecycle stuff inside a 
 	@# project-local kubernetes cluster.
+	make -f demos/cluster-lifecycle.mk
 
 demos demos.test demo-test test.demos:
-	ls demos/*mk | xargs -I% -n1 script -q -e -c "env -i PATH=$${PATH} HOME=$${HOME} bash -x -c \"make -f %\"||exit 255"
+	@# Runs one or more of the demos
+	ls demos/$${demo:-*}mk \
+	| grep -v cluster-lifecycle \
+	| xargs -I% -n1 script -q -e -c "env -i PATH=$${PATH} HOME=$${HOME} bash -x -c \"make -f %\"||exit 255"
+demo/% demos/%:; fname=${*} make demos
 
 ## BEGIN: Documentation related targets
 ##
@@ -133,41 +133,9 @@ docs.jinja/%:
 	&& set -x && pynchon jinja render docs/${*} -o $${tmpf} --print \
 	&& dest="docs/`dirname ${*}`/`basename -s .j2 ${*}`" \
 	&& [ "${*}" == "README.md.j2" ] && mv $${tmpf} README.md || mv $${tmpf} $${dest}
+
 docs.mermaid:; pynchon mermaid apply
-
 docs.mmd: docs.mermaid
-
-## BEGIN: targets for recording demo-gifs used in docs
-##
-## Uses charmbracelete/vhs to record console videos of the test suites 
-##
-vhs: vhs.e2e vhs.demo vhs.tui
-vhs/%:
-	set -x && rm -f img/`basename -s .tape ${*}`*.gif \
-	&& ls docs/tape/${*}* \
-	&& case $${suite:-} in \
-		"") \
-			echo no-suite \
-			&& ls docs/tape/${*}* | make stream.peek \
-			| xargs -I% -n1 sh -x -c "env -i PATH=$${PATH} HOME=$${HOME} vhs %" \
-			&& chafa --invert --symbols braille --zoom img/${*}* \
-			; ;; \
-		*) \
-			echo is-suite \
-			&& pushd tests \
-			&& bash ./bootstrap.sh \
-			&& cp $${suite:-Makefile.e2e.mk} Makefile \
-			&& ls ../docs/tape/${*}* | make stream.peek \
-			| xargs -I% -n1 sh -x -c "env -i PATH=$${PATH} HOME=$${HOME} vhs %" \
-			&& chafa --invert --symbols braille --zoom img/* ../img/docker.png \
-			&& ls img/* | xargs -I% mv % ../img \
-			; ;; \
-	esac
-
-vhs.tui:; suite=Makefile.tui.mk make vhs/tui
-vhs.tui/%:; make vhs/${*}
-vhs.e2e:; suite=Makefile.e2e.mk make vhs/e2e
-vhs.e2e/%:; suite=Makefile.e2e.mk make vhs/${*}
 
 ## BEGIN: CI/CD related targets
 ##
