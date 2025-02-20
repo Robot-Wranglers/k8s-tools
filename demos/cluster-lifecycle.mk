@@ -1,8 +1,28 @@
-# k8s-tools.git: End-to-end tests
+# demos/cluster-lifecycle.mk: 
+#   Demonstrating full cluster lifecycle automation with k8s-tools.git.
+#   This exercises `compose.mk`, `k8s.mk`, plus the `k8s-tools.yml` services to 
+#   interact with a small k3d cluster.  Verbs include: create, destroy, deploy, etc.
+#   
+#   This demo ships with the `k8s-tools` repository and runs as part of the test-suite.
 #
-# Exercising compose.mk, k8s.mk, plus the k8s-tools.yml services 
-# to create & interact with a small k3d cluster.
-
+#   See the documentation here for more discussion: 
+#
+#   USAGE: 
+#
+#     # Default entrypoint runs clean, create, deploy, test, but does not tear down the cluster.  
+#     make -f demos/cluster-lifecycle.mk
+#
+#     # End-to-end, again without teardown 
+#     make -f demos/cluster-lifecycle.mk clean create deploy test
+#
+#     # Interactive shell for a cluster pod
+#     make -f demos/cluster-lifecycle.mk cluster.shell 
+#
+#     # 
+#     make -f demos/cluster-lifecycle.mk cluster.show
+#
+#     # Finally, teardown the cluster
+#     make -f demos/cluster-lifecycle.mk teardown
 
 include k8s.mk
 
@@ -94,7 +114,7 @@ deploy.grafana:
 	| ${make} ansible.helm
 	
 deploy.helm: ▰/helm/self.cluster.deploy_helm_example io.time.wait/5
-deploy.test_harness: ▰/k8s/self.test_harness.deploy
+deploy.test_harness: flux.retry/3/▰/k8s/self.test_harness.deploy
 
 # Private targets with the low-level details for what to do in tool containers. 
 # You can expand this to include usage of `kustomize`, etc. Volumes are already setup,
@@ -113,10 +133,8 @@ self.cluster.deploy_helm_example:
 # and stood up nginx with plain kubectl.  Let's tear down with 
 # ansible to mix it up.
 cluster.teardown:
-	printf "\
-		wait=yes kind=Pod state=absent \
-		name=test-harness namespace=default" \
-	| ${make} ansible.k8s
+	printf "wait=yes kind=Pod state=absent name=test-harness namespace=default" \
+	| ${make} jb | ${make} k8s.ansible
 	printf "\
 		wait=true \
 		name=ahoy \
@@ -129,7 +147,8 @@ cluster.teardown:
 # and then deploy a pod named `test-harness` into it, using a default image.
 # In the body, we'll use kubectl directly to deploy a simple service into the default namespace.
 self.test_harness.deploy: k8s.kubens.create/${POD_NAMESPACE} k8s.test_harness/${POD_NAMESPACE}/${POD_NAME} 
-	kubectl apply -f demos/data/nginx.svc.yml
+	ls demos/data/nginx.svc.yml \
+	&& kubectl apply -f demos/data/nginx.svc.yml
 
 ###############################################################################
 

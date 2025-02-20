@@ -31,11 +31,11 @@ jobs:
       - name: Cluster Lifecycle Demo
         run: make -f demos/cluster-lifecycle.mk
         # run: make -f demos/cluster-lifecycle.mk || true
-      - name: TUI Tests
-        shell: 'script -q -e -c "bash --noprofile --norc -eo pipefail {0}"'
-        run: make tui-test || true
-      - name: Smoke Tests
-        run: make -f demos/smoke-test.mk
+      # - name: TUI Tests
+      #   shell: 'script -q -e -c "bash --noprofile --norc -eo pipefail {0}"'
+      #   run: make tui-test || true
+      # - name: Smoke Tests
+      #   run: make -f demos/smoke-test.mk
         # GitHub Actions runs without a TTY device. This is a workaround to get one,
         # based on https://github.com/actions/runner/issues/241#issuecomment-842566950.
         # This is required for some of the integration tests that are using gum

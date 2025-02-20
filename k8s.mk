@@ -165,7 +165,7 @@ ansible.adhoc/%:
 			$(call log, $${header} ${sep} ${cyan_flow_right}) \
 			&& $(call log.trace, $${header} ${sep} null ${sep} ${cyan_flow_right}) \
 			&& cat $${tmpf}| jq '{"changed":.plays[0].tasks[0].hosts.localhost.changed, "action":.plays[0].tasks[0].hosts.localhost.action, "task":.plays[0].tasks[0].task, "stats":.stats.localhost|with_entries(select(.value != 0))}' ); ;; \
-		*) $(call log, ${red}Cannot parse output from ansible:${dim}); cat $${tmp}; exit 77; ;; \
+		*) $(call log, ${red}Cannot parse output from ansible.  Empty task?${dim}); cat "$${tmpf}"|${stream.indent.to.stderr}; exit 77; ;; \
 	esac
 
 
@@ -214,10 +214,10 @@ ansible.helm: ansible.adhoc/kubernetes.core.helm
 	@# * `[1]`: https://docs.ansible.com/ansible/latest/collections/kubernetes/core/helm_module.html
 	@#
 
-ansible.kubernetes.core.k8s ansible.k8s k8s.ansible: ansible.adhoc/kubernetes.core.k8s
-	@# Interface for ansible's helm module[1].
+ansible.kubernetes.core.k8s k8s.ansible: ansible.adhoc/kubernetes.core.k8s
+	@# Interface for ansible's `kubernetes.core.k8s` module[1].
 	@# This accepts only module args, but there are a few ways to pass them.  
-	@# See the docs in 'ansible.adhoc/<module>' for discussion of examples.	@#
+	@# See the docs in 'ansible.adhoc/<module>' for discussion of examples.
 	@#
 	@# * `[1]`: https://docs.ansible.com/ansible/latest/collections/kubernetes/core/k8s_module.html
 	@#
@@ -371,33 +371,31 @@ k3d.commander:
 	@#   KUBECONFIG=.. ./k8s.mk k3d.commander/<namespace>
 	@# 
 	$(call log, ${GLYPH_K8S} k3d.commander ${sep} ${no_ansi_dim}Opening commander TUI for k3d)
-	TUI_CMDR_PANE_COUNT=5 \
-	TUI_LAYOUT_CALLBACK=.k3d.commander.layout \
-	${make} tux.commander
+	geometry="${GEO_K3D}" ${make} tux.open/flux.loopf/k9s,flux.loopf/k3d.stat
+# TUI_CMDR_PANE_COUNT=5 TUI_LAYOUT_CALLBACK=.k3d.commander.layout ${make} tux.commander
+# k3d.commander/%:
+# 	@# A TUI interface like 'k3d.commander', but additionally sends the given target(s) to the main pane.
+# 	@#
+# 	@# USAGE:
+# 	@#   ./k8s.mk k3d.commander/<target1>,<target2>
+# 	@#
+# 	export k8s_commander_targets="${*}" && ${make} k3d.commander
 
-k3d.commander/%:
-	@# A TUI interface like 'k3d.commander', but additionally sends the given target(s) to the main pane.
-	@#
-	@# USAGE:
-	@#   ./k8s.mk k3d.commander/<target1>,<target2>
-	@#
-	export k8s_commander_targets="${*}" && ${make} k3d.commander
-
-.k3d.commander.layout: .tux.layout.spiral
-	@# A 5-pane layout for k3d command/control
-	@#
-	@# USAGE:  
-	@#   ./k8s.mk k3d.commander/<namespace>
-	@# 
-	$(call log, ${GLYPH_K8S} ${@} ${sep}${dim} Starting widgets and setting geometry) \
-	&& geometry="${GEO_K3D}" ${make} .tux.geo.set  \
-	&& ${make} \
-		.tux.pane/0/flux.apply/k3d.stat,$${k8s_commander_targets:-io.bash} \
-		.tux.pane/1/k9s 
-	tmux send-keys -t 0.3 "sleep 3; entrypoint=bash ${make} k3d/shell" C-m
-	tmux send-keys -t 0.4 "CMK_DEBUG=0 interval=10 ${make} flux.loopf/k8s.cluster.wait" C-m
-	# WARNING: can't use .tux.pane/... here, not sure why 
-	${make} .tux.widget.lazydocker/2/k3d
+# .k3d.commander.layout: .tux.layout.spiral
+# 	@# A 5-pane layout for k3d command/control
+# 	@#
+# 	@# USAGE:  
+# 	@#   ./k8s.mk k3d.commander/<namespace>
+# 	@# 
+# 	$(call log, ${GLYPH_K8S} ${@} ${sep}${dim} Starting widgets and setting geometry) \
+# 	&& geometry="${GEO_K3D}" ${make} .tux.geo.set  \
+# 	&& ${make} \
+# 		.tux.pane/0/flux.apply/k3d.stat,$${k8s_commander_targets:-io.bash} \
+# 		.tux.pane/1/k9s 
+# 	tmux send-keys -t 0.3 "sleep 3; entrypoint=bash ${make} k3d/shell" C-m
+# 	tmux send-keys -t 0.4 "CMK_DEBUG=0 interval=10 ${make} flux.loopf/k8s.cluster.wait" C-m
+# 	# WARNING: can't use .tux.pane/... here, not sure why 
+# 	${make} .tux.widget.lazydocker/2/k3d
 
 k3d.help:; ${make} mk.namespace.filter/k3d.
 	@# Shows targets for just the 'k3d' namespace.

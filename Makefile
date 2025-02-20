@@ -81,11 +81,6 @@ ttest tui-test: test-suite/tui/all
 	@# container and various ways to automate tmux.
 	
 ttest/%:; make test-suite/tui/${*}
-etest e2e e2e-test:
-	@# End-to-end tests.  This tests k8s.mk + compose.mk + k8s-tools.yml
-	@# by walking through cluster-lifecycle stuff inside a 
-	@# project-local kubernetes cluster.
-	make -f demos/cluster-lifecycle.mk
 
 demos demos.test demo-test test.demos:
 	@# Runs one or more of the demos
