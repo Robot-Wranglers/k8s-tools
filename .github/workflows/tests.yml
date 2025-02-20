@@ -26,14 +26,14 @@ jobs:
         run: make clean init
       # - name: Bootstrap Tests
       #   run: sudo apt-get install -y bash make
-      - name: Smoke Tests
-        run: make smoke-test
       # - name: Integration Tests
       #   run: make smoke-test || true
       - name: E2E Tests
         run: make tux.require e2e-test || true
       - name: TUI Tests
         run: make tui-test || true
+      - name: Smoke Tests
+        run: make -f demos/smoke-test.mk
         # GitHub Actions runs without a TTY device. This is a workaround to get one,
         # based on https://github.com/actions/runner/issues/241#issuecomment-842566950.
         # This is required for some of the integration tests that are using gum
