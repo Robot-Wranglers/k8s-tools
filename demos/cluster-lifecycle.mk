@@ -132,7 +132,7 @@ cluster.teardown:
 # and then deploy a pod named `test-harness` into it, using a default image.
 # In the body, we'll use kubectl directly to deploy a simple service into the default namespace.
 self.test_harness.deploy: k8s.kubens.create/${POD_NAMESPACE} k8s.test_harness/${POD_NAMESPACE}/${POD_NAME} 
-	kubectl apply -f nginx.svc.yml
+	kubectl apply -f demos/data/nginx.svc.yml
 
 ###############################################################################
 

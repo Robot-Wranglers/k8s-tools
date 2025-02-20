@@ -29,8 +29,9 @@ jobs:
       # - name: Integration Tests
       #   run: make smoke-test || true
       - name: E2E Tests
-        run: make tux.require e2e-test || true
+        run: make -f demos/cluster-lifecycle.mk || true
       - name: TUI Tests
+        shell: 'script -q -e -c "bash --noprofile --norc -eo pipefail {0}"'
         run: make tui-test || true
       - name: Smoke Tests
         run: make -f demos/smoke-test.mk
@@ -42,7 +43,6 @@ jobs:
       #   # GitHub Actions runs without a TTY device. This is a workaround to get one,
       #   # based on https://github.com/actions/runner/issues/241#issuecomment-842566950.
       #   # This is required for some of the integration tests that are using gum
-      #   shell: 'script -q -e -c "bash --noprofile --norc -eo pipefail {0}"'
       #   run: make tui-test
       # - name: Smoke Tests
       #   run: make smoke-test
