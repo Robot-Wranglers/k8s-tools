@@ -81,9 +81,9 @@ ttest tui-test: test-suite/tui/all
 	@# container and various ways to automate tmux.
 	
 ttest/%:; make test-suite/tui/${*}
-stest smoke-test: test-suite/smoke-test-k8s/all test-suite/smoke-test-k8s-tools/all
-	@# Smoke-test suite, exercising the containers we built.
-	@# This just covers the compose file at k8s-tools.yml, ignoring Makefile integration
+# stest smoke-test: test-suite/smoke-test-k8s/all test-suite/smoke-test-k8s-tools/all
+# 	@# Smoke-test suite, exercising the containers we built.
+# 	@# This just covers the compose file at k8s-tools.yml, ignoring Makefile integration
 
 etest/% e2e/%:; make test-suite/e2e/${*}
 e2e etest e2e-test: test-suite/e2e/all

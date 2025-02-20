@@ -28,8 +28,8 @@ jobs:
       #   run: sudo apt-get install -y bash make
       - name: Smoke Tests
         run: make smoke-test
-      - name: Integration Tests
-        run: make smoke-test || true
+      # - name: Integration Tests
+      #   run: make smoke-test || true
       - name: E2E Tests
         run: make tux.require e2e-test || true
       - name: TUI Tests

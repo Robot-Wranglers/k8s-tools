@@ -964,27 +964,28 @@ docker.volume.panic:; docker volume prune -f
 ##
 ##░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 
-io.gum.div_style:=--border double --align center --width $${width:-$$(echo "x=$$(tput cols) - 5;if (x < 0) x=-x; default=30; if (default>x) default else x" | bc)}
-io.gum.default_style:=--border double --foreground 2 --border-foreground 2
+io.gum=(which gum >/dev/null && ( ${1} ) \
+	|| (entrypoint=gum cmd="${1}" quiet=0 \
+		img=charmcli/gum:v0.15.2 ${make} docker.run.sh)) > /dev/stderr
+
+io.gum.style.div:=--border double --align center --width $${width:-$$(echo "x=$$(tput cols) - 5;if (x < 0) x=-x; default=30; if (default>x) default else x" | bc)}
+io.gum.style.default:=--border double --foreground 2 --border-foreground 2
 
 charm.glow:=docker run -i charmcli/glow:v1.5.1 -s dracula
 
 io.gum.style=label="${1}" ${make} io.gum.style
 
-define Dockerfile.gum
-# Default container does not include any shell, 
-# which prevents using 'gum spin -- sleep ..', etc
-FROM ${GUM_IMAGE:-ghcr.io/charmbracelet/gum} as gum
-FROM ${DEBIAN_CONTAINER_VERSION:-debian:bookworm}
-COPY --from=gum /usr/local/bin/gum /usr/bin
-endef
+# define Dockerfile.gum
+# # Default container does not include any shell, 
+# # which prevents using 'gum spin -- sleep ..', etc
+# FROM ${GUM_IMAGE:-ghcr.io/charmbracelet/gum} as gum
+# FROM ${DEBIAN_CONTAINER_VERSION:-debian:bookworm}
+# COPY --from=gum /usr/local/bin/gum /usr/bin
+# endef
 
-io.gum=(which gum >/dev/null && ( ${1} ) \
-	|| (entrypoint=bash cmd="${dash_x_maybe} -c '${1}'" quiet=1 \
-		img=gum ${make} docker.from.def/gum mk.docker.run.sh)) > /dev/stderr
 io.gum.tty=export tty=1; $(call io.gum, ${1})
-io.gum.format.code=$(call io.gum, ${stream.stdin} | gum format -t code) | ${stream.trim}
-io.gum.format.code:; $(call io.gum.format.code)
+# io.gum.format.code=$(call io.gum, ${stream.stdin} | gum format -t code) | ${stream.trim}
+# io.gum.format.code:; $(call io.gum.format.code)
 io.gum.spin:
 	@# Runs `gum spin` with the given command/label.
 	@#
@@ -1011,7 +1012,7 @@ io.gum.style:
 	@#   label="..." ./compose.mk io.gum.style 
 	@#   width=30 label='...' ./compose.mk io.gum.style 
 	@#
-	$(call io.gum, gum style ${io.gum.default_style} ${io.gum.div_style} \"$${label}\")
+	$(call io.gum, style ${io.gum.style.default} ${io.gum.style.div} \"$${label}\")
 
 io.gum.style/%:; ( width=`echo \`tput cols\` / ${*} | bc` ${make} io.gum.style )
 	@# Prints a divider on stdout for the given fraction of the full terminal width,
@@ -2617,7 +2618,7 @@ GEO_TMP="5bbe,202x49,0,0{151x49,0,0,1,50x49,152,0[50x24,152,0,2,50x12,152,25,3,5
 
 export TUI_BOOTSTRAP?=tux.require
 export TUX_BOOTSTRAPPED= 
-export COMPOSE_EXTRA_ARGS=-f ${CMK_COMPOSE_FILE}
+export COMPOSE_EXTRA_ARGS?=
 export TUI_COMPOSE_FILE?=${CMK_COMPOSE_FILE}
 export TUI_SVC_NAME?=tux
 export TUI_INIT_CALLBACK?=.tux.init
