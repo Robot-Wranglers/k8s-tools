@@ -969,7 +969,7 @@ io.gum.default_style:=--border double --foreground 2 --border-foreground 2
 
 charm.glow:=docker run -i charmcli/glow:v1.5.1 -s dracula
 
-io.gum.style=label="${1}" make io.gum.style
+io.gum.style=label="${1}" ${make} io.gum.style
 
 define Dockerfile.gum
 # Default container does not include any shell, 

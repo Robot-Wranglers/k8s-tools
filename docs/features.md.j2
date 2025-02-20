@@ -4,11 +4,25 @@
 
 <hr style="width:100%;border-bottom:3px solid black;">
 
-## Versioned Toolkit
+### Curated Tool Containers
 
-**[k8s-tools.yml](k8s-tools.yml)** is a docker compose file with 20+ container specifications covering popular platforming tools and other utilities for working with Kubernetes.  This file makes use of the [dockerfile_inline directive](https://docs.docker.com/compose/compose-file/build/#dockerfile_inline), plus the fact that tool-containers  *tend to involve layering really small customizations*.  
+**[k8s-tools.yml](k8s-tools.yml)** is a docker compose file with 20+ container specifications covering popular platforming tools and other utilities for working with Kubernetes.  
 
-Now you can version these tools explicitly, customize them if you need to, and still avoid having N Dockerfiles cluttering up your whole repository.  **All tool containers are just-in-time & on-demand,** so that having these declared in case of eventual use won't saddle you with an enormous bootstrap process.  As usual with docker-compose, containers aren't pulled until they are used, and build-when-changed mostly works as you'd expect.  
+The collection is structured in the following ways:
+
+1. **Executable file,** i.e. *./k8s-tools.yml ...*  is equivalent to *docker compose -f k8s-tools.yml ...*.
+1. **Tool containers are easy to change / extend, in place.**  Using the [dockerfile_inline directive](https://docs.docker.com/compose/compose-file/build/#dockerfile_inline), plus the fact that tool-containers  *tend to involve layering really small customizations*.  Customize them if you need to, and you can still avoid having N Dockerfiles cluttering up your whole repository.  
+1. **Default versions for container-bases are provided,** but you can set an environment variable to [override them individually]({{mkdocs.site_relative_url}}/config#k8stoolsyml).
+1. **Sane defaults for volumes & environments are included for each tool-container,** meaning that sharing the working directory, docker socket, and kubeconfigs is done automatically.  For host vs. container file permissions, `k8s-tools.yml` also attempts to provide *smoother operations with root-user containers* (*[more details here]({{mkdocs.site_relative_url}}/limitations#docker-and-file-permissions)*.  
+1. **All tool containers are just-in-time & on-demand,** so that having these declared in case of eventual use won't saddle you with an enormous bootstrap process.  As usual with docker-compose, containers aren't pulled until they are used, and build-when-changed mostly works as you'd expect.  
+
+The overall focus for `k8s-tools.yml` is to stand alone with no host dependencies (not even Dockerfiles), yet provide boilerplate that's parametric enough to work pretty well across different projects without changing the compose file.  Read on in the next section for more details about the manifest.
+
+{# <hr style="width:100%;border-bottom:3px solid black;"> #}
+
+<hr style="width:95%;border-bottom:1px dashed black;">
+
+### Toolbox Manifest 
 
 Here's a quick overview of the manifest and some details about versioning:
 
@@ -21,8 +35,6 @@ Here's a quick overview of the manifest and some details about versioning:
 * Krew plugins: [sick-pods](https://github.com/alecjacobs5401/kubectl-sick-pods), [ktop](https://github.com/vladimirvivien/ktop), [kubectx, and kubens](https://github.com/ahmetb/kubectx) available by default, and more on demand.
 * TUI and user-messaging utilities: [gum](https://github.com/charmbracelet/gum), [pv](https://www.ivarch.com/programs/pv.shtml), [spark](https://raw.githubusercontent.com/holman/spark/), [tte](https://github.com/ChrisBuilds/terminaltexteffects)
 * General Utilities: Fixed (i.e. non-busybox) versions of things like date, ps, uuidgen, etc
-* **Tooling in the local bundle is all versioned independently:**
-  * Defaults are provided, but [overrides allowed from environment variables]({{mkdocs.site_relative_url}}/config#k8stoolsyml).
 
 **Upstream parts of the tool bundle** ([See the latest here](https://github.com/alpine-docker/k8s/blob/master/README.md#installed-tools))
 
@@ -34,17 +46,12 @@ Here's a quick overview of the manifest and some details about versioning:
 * **Upstream tool versioning is determined by the alpine-k8s base,**
   * But *k8s-tools.yml* has service-stubs for quick overrides if you need something specific.
 
-<hr style="width:100%;border-bottom:3px solid black;">
 
-## Bonus Features
-
-**Sane defaults for volumes & environments are included for each tool-container,** meaning that sharing the working directory, docker socket, and kubeconfigs is done automatically.  For host vs. container file permissions, `k8s-tools.yml` also attempts to provide *smoother operations with root-user containers* (*[more details here]({{mkdocs.site_relative_url}}/limitations#docker-and-file-permissions)*.  
-
-For advanced usage of the tool containers defined in `k8s-tools.yml` it's best to pair it with the rest of the automation here, but the compose file also works in stand-alone mode.  The file is even executable, and  *./k8s-tools.yml ...*  is equivalent to *docker compose -f k8s-tools.yml ...*.
-
-**The focus for k8s-tools.yml is to stand alone with no host dependencies, not even Dockerfiles, yet provide boilerplate that's parametric enough to work pretty well across different projects without changing the compose file.**  If the default tool versions don't work for your use-cases, [k8s-tools.yml probably has an environment variable you can override]({{mkdocs.site_relative_url}}/config).
 
 {#
+### Bonus Features
+
+  If the default tool versions don't work for your use-cases, [k8s-tools.yml probably has an environment variable you can override]({{mkdocs.site_relative_url}}/config).
 -------
 
 -------
@@ -73,15 +80,32 @@ The best way to think of compose.mk is to consider it an extension of `make` tha
 
 ### Automation with k8s.mk
 
-After you've made your whole kit portable in one swipe, you might want to focus on *driving* those tools with something that offers more structure than a shell script, and something that also *won't add to your host dependencies*.  If that sounds interesting, you might like to meet `compose.mk` and `k8s.mk`. 
+After you've made your whole kit portable in one swipe with the compose file, you might want to focus on *driving* those tools with something that offers more structure than a shell script, and something that also *won't add to your host dependencies*.  
 
-**[k8s.mk](/k8s.mk)** inherits all the *compose.mk* features, then integrates with *k8s-tools.yml*.  Both *compose.mk* and *k8s-tools.yml* files are a soft-dependency for *k8s.mk*, because the emphasis is on seamless usage of those containers.  
+If that sounds interesting, you might like to meet `compose.mk` and `k8s.mk`:
 
-In terms of wrappers, all of the autogenerated targets for low-level container access described by [the Make/Compose Bridge]({{mkdocs.site_relative_url}}/compose.mk#makecompose-bridge) are available for the *k8s-tools.yml* services, plus more composite functionality.  
+<hr style="width:95%;border-bottom:1px dashed black;">
 
-For example, `k8s.mk` provides some primitives for common tasks (*like waiting for all pods to be ready*), context management (*like setting the active namespace*), and the usual patterns (*like idempotent usage of `helm`*).  Besides helping to version tools, it can make it simpler to interact with them or make it simpler to script actions that involve multiple tools. Additionally, `k8s.mk` also inherits and extends the [TUI support from compose.mk]({{mkdocs.site_relative_url}}/compose.mk#embedded-tui), including the ability to automate the TUI itself. 
+**[compose.mk]({{jinja.vars.composemk_docs_url}})**
 
-* **Main features:**
+:   A domain-agnostic tool / library for makefile-based automation, scripting, and lightweight orchestration.  Native support for docker, docker-compose, workflow primitives, TUI elements, and more.
+
+**[k8s.mk](/k8s.mk)**
+
+:   A kubernetes-specific extension of `compose.mk`, inheriting all of the above features plus easy access to the `k8s-tools.yml` manifest, providing powerful ways to run automation *inside* tool-containers and script orchestration *across* those tool containers.
+
+So whereas `compose.mk` is useful in general, `k8s.mk` is of more focused on projects working with kubernetes.  (In fact.. you might say `k8s.mk` is the *reference implementation* for how to go about extending `compose.mk`.)  A description of the full capabilities for `compose.mk` is out of scope for this documentation and not strictly required, but [it's worth reading!](#).
+
+<hr style="width:95%;border-bottom:1px dashed black;">
+
+For our purposes here, the most relevant feature of `compose.mk` is that it can **[automatically generate automation scaffolding]({{jinja.vars.composemk_docs_url}})** for each of the tool-containers that are defined in a compose-file.  [This automation scaffolding is in the form of make-targets]({{jinja.vars.composemk_docs_url}}), and because `make` targets always do double-duty as CLI entrypoints and as *reusable task units*, the "internal API" is automatically published as a CLI interface.  And since *composing task-units into DAGs* is so simple, building up surprisingly sophisticated automation is very easy.
+
+Because "importing" the `k8s-tools.yml` containers gives us simple handles to interact with them, using `k8s.mk` tends to be the most convenient way to invoke them.  Using that as a base, we can also start to build an automation "vocabulary" on top and make it available for other scripting.
+
+For example, `k8s.mk` provides some primitives for common tasks ([*like waiting for all pods to be ready*](#), or [*waiting for cluster creation to finish*](#)), context management ([*like setting the active kubernetes namespace*](#)), and the usual patterns ([*like idempotent usage of `helm`*](#)).  So besides helping to *only make calls to versioned tools*, `k8s.mk` can make it simpler to interact with them or make it simpler to script actions that involve multiple tools. And since `k8s.mk` also inherits and extends the [TUI support from compose.mk]({{mkdocs.site_relative_url}}/compose.mk#embedded-tui), one can quickly throw together custom dashboards that [actually treat other programs like k9s as widgets]({{jinja.vars.composemk_docs_url}}).
+
+With that background out of the way.. a summary of the main features for k8s.mk looks something like this:
+
   * Useful as a library, especially if you're building cluster lifecycle automation
   * Useful as an interactive debugging/inspection/development tool.
   * Helps to do the common tasks quickly, either interactively or from other automation
@@ -92,5 +116,14 @@ For example, `k8s.mk` provides some primitives for common tasks (*like waiting f
       * [**`k8s.*` targets:**]({{mkdocs.site_relative_url}}/api#api-k8s) Default namespace with debugging tools, cluster life-cycle primitives, etc.
       * [**`ansible.*` targets:**]({{mkdocs.site_relative_url}}/api#api-ansible) A direct interface to containerized versions of things like [kubernetes.core.k8s](https://docs.ansible.com/ansible/latest/collections/kubernetes/core/k8s_module.html) or [kubernetes.core.helm](https://docs.ansible.com/ansible/latest/collections/kubernetes/core/helm_module.html), no playbooks and no inventories required.
       * **Many more specific interfaces** to things like [k3d]({{mkdocs.site_relative_url}}/api#api-k3d), [kubefwd]({{mkdocs.site_relative_url}}/api#api-kubefwd), etc. [See the full API here.]({{mkdocs.site_relative_url}}/api#k8smk-api)
+
+{#
+, because **the k8s-tools suite** is basically a reference implementation for how to extend it.
+
+Detailed description of the compose.mk capabilities is out of scope here, [full documentation for compose.mk]({{jinja.vars.composemk_docs_url}}) 
+
+Extending a`compose.mk` inherits all the *compose.mk* features, then integrates with *k8s-tools.yml*.  Both *compose.mk* and *k8s-tools.yml* files are a soft-dependency for *k8s.mk*, because the emphasis is on seamless usage of those containers.  
+
+In terms of wrappers, all of the autogenerated targets for low-level container access described by [the Make/Compose Bridge]({{mkdocs.site_relative_url}}/compose.mk#makecompose-bridge) are available for the *k8s-tools.yml* services, plus more composite functionality.  
+#}
   
-Whereas `compose.mk` is useful in general, `k8s.mk` is of course more focused on projects working with kubernetes, and is the best example of how to go about extending `compose.mk`.

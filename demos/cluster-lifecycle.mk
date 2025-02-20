@@ -9,31 +9,22 @@
 #   USAGE: make -f demos/cluster-lifecycle.mk
 
 
-# Standard boilerplate for make itself, nothing to see here.
-# SHELL := bash
-# MAKEFLAGS=-sS --warn-undefined-variables
 include k8s.mk
 
 .DEFAULT_GOAL := all 
 
-# .SHELLFLAGS := -euo pipefail -c
-# .SUFFIXES:
-
 # Override k8s-tools.yml service-defaults, 
 # explicitly setting the k3d version used
-export K3D_VERSION:=v5.6.3
-
 # Ensure local KUBECONFIG exists & ignore anything from environment
+# Chart & Pod details that we'll use later during deploy
+# Cluster details that will be used by k3d.
+export K3D_VERSION:=v5.6.3
 export KUBECONFIG:=./fake.profile.yaml
 export _:=$(shell umask 066;touch ${KUBECONFIG})
-
-# Chart & Pod details that we'll use later during deploy
 export HELM_REPO:=https://helm.github.io/examples
 export HELM_CHART:=examples/hello-world
 export POD_NAME?=test-harness
 export POD_NAMESPACE?=default
-
-# Cluster details that will be used by k3d.
 export CLUSTER_NAME:=k8s-tools-e2e
 
 # Generate target-scaffolding from all the tool-containers

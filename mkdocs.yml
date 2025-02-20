@@ -29,7 +29,7 @@ nav:
     - 'K8s-tools.yml': 'k8s-tools.yml.md'
     - 'K8s.mk': 'k8s.mk.md'
   - API:
-    - api.md
+    - 'Full API': api.md
   - Demos:
     - 'End-to-End Cluster Lifecycle': demos/cluster-lifecycle.md
   - Other:

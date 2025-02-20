@@ -31,7 +31,7 @@ jobs:
       - name: Integration Tests
         run: make smoke-test || true
       - name: E2E Tests
-        run: make e2e-test || true
+        run: make tux.require e2e-test || true
       - name: TUI Tests
         run: make tui-test || true
         # GitHub Actions runs without a TTY device. This is a workaround to get one,

@@ -15,7 +15,7 @@ THIS_MAKEFILE:=$(abspath $(firstword $(MAKEFILE_LIST)))
 .DEFAULT_GOAL:=help
 
 .SUFFIXES:
-.PHONY: docs
+.PHONY: docs demos
 
 export SRC_ROOT := $(shell git rev-parse --show-toplevel 2>/dev/null || pwd)
 export PROJECT_ROOT := $(shell dirname ${THIS_MAKEFILE})
@@ -43,7 +43,7 @@ clean: flux.stage.clean
 	rm -f tests/compose.mk tests/k8s.mk tests/k8s-tools.yml
 	find .| grep .tmp | xargs rm 2>/dev/null|| true
 	
-build: 
+normalize build: 
 	@# Only used during development; normal usage involves build-on-demand.
 	@# This uses explicit ordering that is required because compose 
 	@# key for 'depends_on' affects the ordering for 'docker compose up', 
@@ -53,27 +53,6 @@ test: e2e-test integration-test smoke-test tui-test
 
 docs: docs.jinja #docs.mermaid
 
-
-normalize: 
-
-## BEGIN: CI/CD related targets
-##
-# cicd.clean: clean.github.actions
-# clean.github.actions:
-# 	@#
-# 	@#
-# 	query=".workflow_runs[].id" \
-# 	&& org_name=`pynchon github cfg|jq -r .org_name` \
-# 	&& repo_name=`pynchon github cfg|jq -r .repo_name` \
-# 	&& repo_name="$${org_name}/$${repo_name}" \
-# 	&& set -x && failed_runs=$$(\
-# 		gh api --paginate \
-# 			-X GET "/repos/$${repo_name}/actions/runs" \
-# 			-F status=failure -q "$${query}") \
-# 	&& for run_id in $${failed_runs}; do \
-# 		echo "Deleting failed run ID: $${run_id}"; \
-# 		gh api -X DELETE "/repos/$${repo_name}/actions/runs/$${run_id}"; \
-# 	done
 
 ## BEGIN: Testing entrypoints
 ##
@@ -106,16 +85,14 @@ stest smoke-test: test-suite/smoke-test-k8s/all test-suite/smoke-test-k8s-tools/
 	@# Smoke-test suite, exercising the containers we built.
 	@# This just covers the compose file at k8s-tools.yml, ignoring Makefile integration
 
-itest integration-test: test-suite/itest/all
-	@# Integration-test suite.  This tests compose.mk and ignores k8s-tools.yml.
-	@# Exercises container dispatch and the make/compose bridge.  No kubernetes.
-itest/%:; make test-suite/itest/${*}
-
 etest/% e2e/%:; make test-suite/e2e/${*}
 e2e etest e2e-test: test-suite/e2e/all
 	@# End-to-end tests.  This tests k8s.mk + compose.mk + k8s-tools.yml
 	@# by walking through cluster-lifecycle stuff inside a 
 	@# project-local kubernetes cluster.
+
+demos demos.test demo-test test.demos:
+	ls demos/*mk | xargs -I% -n1 script -q -e -c "env -i PATH=$${PATH} HOME=$${HOME} bash -x -c \"make -f %\"||exit 255"
 
 ## BEGIN: Documentation related targets
 ##
@@ -163,9 +140,6 @@ docs.mmd: docs.mermaid
 ## BEGIN: targets for recording demo-gifs used in docs
 ##
 ## Uses charmbracelete/vhs to record console videos of the test suites 
-## Videos for demos of the TUI
-## Videos of the e2e test suite. ( Order matters here )
-## Videos of the integration test suite. ( Order matters here )
 ##
 vhs: vhs.e2e vhs.demo vhs.tui
 vhs/%:
@@ -190,9 +164,18 @@ vhs/%:
 			; ;; \
 	esac
 
-vhs.demo:; suite=Makefile.itest.mk make vhs/demo
-vhs.demo/%:; suite=Makefile.itest.mk make vhs/${*}
 vhs.tui:; suite=Makefile.tui.mk make vhs/tui
 vhs.tui/%:; make vhs/${*}
 vhs.e2e:; suite=Makefile.e2e.mk make vhs/e2e
 vhs.e2e/%:; suite=Makefile.e2e.mk make vhs/${*}
+
+## BEGIN: CI/CD related targets
+##
+
+cicd.clean: clean.github.actions
+clean.github.actions:
+	@#
+	@#
+	gh run list --status failure --json databaseId \
+	| ${stream.peek} | jq -r '.[].databaseId' \
+	| xargs -n1 -I% sh -x -c "gh run delete %"

@@ -32,7 +32,6 @@ $ helm ....
 
 You'll probably want to read over the [compose.mk]({{mkdocs.site_relative_url}}/compose.mk) section to really understand what's going on here.  In case you've already seen it though, here's the quick start with the copy/paste stuff.
 
-{% set integration_block %}
 First, copy the files from this repo into your project:
 
 ```bash
@@ -90,8 +89,6 @@ self.test:
   kubectl --version
   echo hello world from `uname -n -v`
 ```
-{% endset %}
-{{integration_block}}
 
 {#
 ### Stand Alone Tools
