@@ -340,6 +340,9 @@ helm.chart.install/%:
 # Geometry for k3d.commander
 GEO_K3D="5b40,111x56,0,0[111x41,0,0{55x41,0,0,1,55x41,56,0[55x16,56,0,2,55x24,56,17,3]},111x14,0,42{55x14,0,42,4,55x14,56,42,5}]"
 
+k3d.cluster.exists/% k3d.has_cluster/%:; k3d cluster list | grep ${*}
+k3d.cluster_missing/%:; ${make} flux.negate/k3d.has_cluster/${*}
+
 k3d.cluster.delete/%:
 	@# Idempotent version of k3d cluster delete 
 	@#
@@ -361,7 +364,7 @@ k3d.cluster.list k3d.list:
 	&& (case "$${CMK_INTERNAL:-0}" in \
 		0) ${log.trace.target.rerouting} && printf "$${cmd}" | CMK_DEBUG=0 ${make} k8s-tools/k3d/shell/pipe; ;; \
 		*) eval $${cmd}; ;;  \
-	esac) | tr -d '\n' | ${stream.indent}
+	esac) | xargs -n1 echo  | ${stream.indent}
 
 k3d.commander:
 	@# Starts a 4-pane TUI dashboard, using the commander layout.  

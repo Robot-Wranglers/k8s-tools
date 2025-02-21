@@ -780,6 +780,12 @@ docker.run/%:
 	&& entrypoint=make \
 		cmd="${MAKE_FLAGS} ${makefile_list} ${*}" \
 			img=$${img} ${make} docker.run.sh
+docker.image.dispatch/%:
+	@# Similar to `docker.run/<arg>`, but accepts the image and the target.
+	@# USAGE:
+	@#  ./compose.mk docker.image.dispatch/<img>/<target>
+	tty=1 img=`printf "${*}"|cut -d/ -f1` ${make} docker.run/`printf "${*}"|cut -d/ -f2-`
+
 docker.run.image/%:
 	@# Runs the given commands in the given image.
 	@#
@@ -870,23 +876,24 @@ docker.run.sh:
 	&& printf ${*} | sed 's/,/\n/g' \
 	| xargs -I% printf " -e %=\"\`echo \$${%}\`\""; printf '\n'
 
-docker.start/%:; img="${*}" entrypoint=none ${make} docker.run.sh
-	@# Starts the named docker image with the default entrypoint
-	@# USAGE: 
-	@#   ./compose.mk docker.start/<img>
-
 docker.start:; ${make} docker.start/$${img}
 	@# Like 'docker.run', but uses the default entrypoint.
 	@# USAGE: 
 	@#   img=.. ./compose.mk docker.start
 
+docker.start/%:; img="${*}" entrypoint=none ${make} docker.run.sh
+	@# Starts the named docker image with the default entrypoint
+	@# USAGE: 
+	@#   ./compose.mk docker.start/<img>
 .docker.start/%:; ${make} docker.start/compose.mk:${*}
 	@# Like 'docker.start' but implicitly uses 'compose.mk' prefix. This is used with "local" images.
+
+docker.start.tty/%:; tty=1 ${make} docker.start/${*}
+
 
 docker.socket:; ${make} docker.context/current | ${jq.run} -r .Endpoints.docker.Host
 	@# Returns the docker socket in use for the current docker context.
 	@# No arguments & pipe-friendly.
-	
 
 docker.stat:
 	@# Show information about docker-status.  No arguments.
@@ -966,15 +973,13 @@ docker.volume.panic:; docker volume prune -f
 io.gum=(which gum >/dev/null && ( ${1} ) \
 	|| (entrypoint=gum cmd="${1}" quiet=0 \
 		img=charmcli/gum:v0.15.2 ${make} docker.run.sh)) > /dev/stderr
-
+io.gum.style=label="${1}" ${make} io.gum.style
 io.gum.style.div:=--border double --align center --width $${width:-$$(echo "x=$$(tput cols) - 5;if (x < 0) x=-x; default=30; if (default>x) default else x" | bc)}
 io.gum.style.default:=--border double --foreground 2 --border-foreground 2
+io.gum.tty=export tty=1; $(call io.gum, ${1})
 
 charm.glow:=docker run -i charmcli/glow:v1.5.1 -s dracula
 
-io.gum.style=label="${1}" ${make} io.gum.style
-
-io.gum.tty=export tty=1; $(call io.gum, ${1})
 # io.gum.format.code=$(call io.gum, ${stream.stdin} | gum format -t code) | ${stream.trim}
 # io.gum.format.code:; $(call io.gum.format.code)
 io.gum.spin:
@@ -1878,7 +1883,7 @@ flux.if.then/%:
 	$(trace_maybe) \
 	&& _if=`printf "${*}"|cut -s -d, -f1` \
 	&& _then=`printf "${*}"|cut -s -d, -f2-` \
-	header="${GLYPH_FLUX} flux.if.then ${sep}${dim}" \
+	&& header="${GLYPH_FLUX} flux.if.then ${sep}${dim}" \
 	&& $(call log, $${header} ${ital}$${_if}${no_ansi} ${sep} ${dim}${bold}$${_then}) \
 	&& case $${verbose:-0} in \
 		0) ${make} $${_if} 2>/dev/null; st=$$?; ;; \
@@ -1888,6 +1893,24 @@ flux.if.then/%:
 		0) $(call log.trace, $${header} ${yellow}(Condition ok)); ${make} $${_then}; ;; \
 		*) $(call log.trace, $${header} ${yellow}(Condition failed)); ;; \
 	esac
+stream.obliviate=${all_devnull}
+flux.if.then.else/%:
+	@# Standard if/then/else control flow, for make targets.
+	@#
+	@# USAGE: ( generic )
+	@#   ./compose.mk flux.if.then.else/<name_of_test_target>,<name_of_then_target>,<name_of_else_target>
+	@#
+	_if=`printf "${*}"|cut -s -d, -f1` \
+	&& _then=`printf "${*}"|cut -s -d, -f2` \
+	&& _else=`printf "${*}"|cut -s -d, -f3-` \
+	&& header="${GLYPH_FLUX} flux.if.then.else ${sep}${dim} testing ${dim_ital}$${_if} " \
+	&& $(call log.part1, $${header}) \
+	&& ${make} $${_if} ${stream.obliviate} \
+	; case $${?} in \
+		0) $(call log.part2, ${dim_green}true${no_ansi_dim} - dispatching ${dim_cyan}$${_then}) ; ${make} $${_then};; \
+		*) $(call log.part2, ${yellow}false${no_ansi_dim} - dispatching ${dim_cyan}$${_else}); ${make} $${_else};; \
+	esac
+
 
 flux.indent/%:
 	@# Given a target, this runs it and indents both the resulting output for both stdout/stderr.
@@ -3276,9 +3299,8 @@ endef
 .tux.widget.lazydocker: .tux.widget.lazydocker/0
 
 # https://github.com/moncho/dry
-.tux.widget.ctop:
-	sleep 2; tty=1 img=moncho/dry ${make} docker.start
-	
+.tux.widget.ctop:; sleep 2; ${make} docker.start.tty/moncho/dry
+
 .tux.widget.lazydocker/%:
 	@# Starts lazydocker in the TUI, then switches to the "statistics" tab.
 	@#

@@ -49,7 +49,7 @@ export POD_NAMESPACE?=default
 $(eval $(call compose.import, ▰, TRUE, k8s-tools.yml))
 
 # Default target should do everything, end to end.
-all: clean create deploy test
+all: flux.and/clean,create,deploy,test
 
 ###############################################################################
 
@@ -57,9 +57,9 @@ all: clean create deploy test
 # plus (optional) convenience-aliases and stage-labels.
 
 # These run private subtargets inside the named  tool containers (i.e. `k3d`).
-clean cluster.clean: flux.stage/ClusterClean ▰/k3d/self.cluster.clean
-create cluster.create: flux.stage/ClusterCreate ▰/k3d/self.cluster.create
-teardown: flux.stage/ClusterTeardown cluster.teardown
+clean cluster.clean: flux.stage/cluster.clean ▰/k3d/self.cluster.clean
+create cluster.create: flux.stage/cluster.create ▰/k3d/self.cluster.create
+teardown: flux.stage/cluster.teardown cluster.teardown
 
 # Plus a convenience alias to wait for all pods in all namespaces.
 wait cluster.wait: k8s.cluster.wait
@@ -67,33 +67,36 @@ wait cluster.wait: k8s.cluster.wait
 # Private targets for low-level cluster-ops.
 # Host has no `k3d` command, so these targets
 # run inside the `k3d` service from k8s-tools.yml
-self.cluster.create:
-	( k3d cluster list | grep $${CLUSTER_NAME} \
-	  || k3d cluster create $${CLUSTER_NAME} \
-			--servers 3 --agents 3 \
-			--api-port 6551 --port '8080:80@loadbalancer' \
-			--volume $$(pwd)/:/$${CLUSTER_NAME}@all --wait )
-	
-self.cluster.clean:
-	set -x && k3d cluster delete $${CLUSTER_NAME}
+#  ./compose.mk flux.do.unless/<umbrella>,<dry>
+self.cluster.create: flux.do.unless/.self.cluster.create/$${CLUSTER_NAME},k3d.has_cluster/$${CLUSTER_NAME}
+# ( k3d cluster list | grep $${CLUSTER_NAME} \
+#   || ${make} .self.cluster.create )
+.self.cluster.create/%:
+	k3d cluster create ${*} \
+	--servers 3 --agents 3 \
+	--api-port 6551 --port '8080:80@loadbalancer' \
+	--volume $$(pwd)/:/${*}@all --wait
+# k3d.	
+self.cluster.clean: k3d.cluster.delete/$${CLUSTER_NAME}
 
 ###############################################################################
 
 # Top level public targets for deployments & (optional) convenience-aliases and stage-labels.
 # These run private subtargets inside the named  tool containers (i.e. `helm`, and `k8s`).
-deploy cluster.deploy: flux.stage/DeployApps flux.loop.until/k8s.cluster.ready deploy.helm deploy.test_harness deploy.prometheus
+deploy cluster.deploy: \
+	flux.stage/cluster.deploy \
+	flux.loop.until/k8s.cluster.ready \
+	deploy.helm deploy.test_harness deploy.prometheus
 	# add a label to the default namespace
 	key=manager val=k8s.mk ${make} k8s.namespace.label/${POD_NAMESPACE}
 deploy.prometheus:
-	printf "\
-		wait=yes \
+	${jb} wait=yes \
 		create_namespace=yes \
 		chart_ref=prometheus \
 		chart_version=25.24.1 \
 		name=prometheus-community \
 		release_namespace=prometheus \
-		chart_repo_url=https://prometheus-community.github.io/helm-charts" \
-	| ${make} jb \
+		chart_repo_url="https://prometheus-community.github.io/helm-charts" \
 	| ${make} ansible.helm
 fwd.grafana:
 	mapping="80:8081" ${make} kubefwd.start/prometheus/grafana
@@ -133,14 +136,9 @@ self.cluster.deploy_helm_example:
 # and stood up nginx with plain kubectl.  Let's tear down with 
 # ansible to mix it up.
 cluster.teardown:
-	printf "wait=yes kind=Pod state=absent name=test-harness namespace=default" \
-	| ${make} jb | ${make} k8s.ansible
-	printf "\
-		wait=true \
-		name=ahoy \
-		state=absent \
-		release_namespace=default" \
-	| ${make} jb \
+	${jb} wait=yes kind=Pod state=absent name=test-harness namespace=default \
+	| ${make} k8s.ansible
+	${jb} wait=true name=ahoy state=absent release_namespace=default \
 	| ${make} ansible.helm 
 
 # Prerequisites up top create & activate the `default` namespace 
@@ -153,7 +151,7 @@ self.test_harness.deploy: k8s.kubens.create/${POD_NAMESPACE} k8s.test_harness/${
 ###############################################################################
 
 test: test.cluster test.contexts 
-test.cluster cluster.test: flux.stage/test ▰/k8s/k8s.cluster.wait
+test.cluster cluster.test: flux.stage/cluster.test cluster.wait
 	label="Showing kubernetes status" ${make} io.gum.style 
 	${make} k8s/dispatch/k8s.stat 
 	label="Previewing topology for default namespace" ${make} io.gum.style 
