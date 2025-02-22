@@ -1,4 +1,5 @@
-# Configuration
+## Configuration
+<hr style="width:100%;border-bottom:3px solid black;">
 
 For many simple use-cases, the k8s-tools suite only wants the familiar environment variables that your tools require, and in particular things like `KUBECONFIG`, `AWS_PROFILE` are inherited as usual from the calling environment.  
 
@@ -7,10 +8,12 @@ Although in practice most things have defaults, each component of the k8s-tools 
 In a few cases and hopefully for good reasons, **configuration might sometimes involve editing some part of the k8s-tools suite in-place.**  For example,  `k8s-tools.yml` needs to specify file volumes, and while it does share `KUBECONFIG` by default, sharing directories like `~/.aws` and `~/.ssh` are commented by default, and users must explicitly opt-in.  As another example, editing the particulars of [the embedded TUI]({{mkdocs.site_relative_url}}/compose.mk#embedded-tui) should not be necessary, but is easily done if you're willing to reach into [`compose.mk` source]({{github.repo_url}}/tree/master/compose.mk).  See also [this discussion of forking]({{mkdocs.site_relative_url}}/integration#forking) included as part of the [integration docs]({{mkdocs.site_relative_url}}/integration)
 
 ### k8s-tools.yml
+<hr style="width:100%;border-bottom:3px solid black;">
 
 There are two main ways to configure the compose file that defines tool containers: you can [override tool versions](#versions), or you can [set defaults for docker](#docker)
 
 #### Versions 
+------------------------------------------------------------------------------
 
 Here's a list of version defaults in `k8s-tools.yml` currently:
 
@@ -19,6 +22,7 @@ Here's a list of version defaults in `k8s-tools.yml` currently:
 ```
 
 #### Docker
+------------------------------------------------------------------------------
 
 **If you're using `compose.mk` or `k8s.mk` directly or as an `include`,** these variables are set for you automatically from a best-guess when they are not provided.
 
@@ -28,15 +32,17 @@ Here's a list of version defaults in `k8s-tools.yml` currently:
 {{bash("cat k8s-tools.yml | grep -o -w '[$]{[^}]*}' | grep ':-'|uniq|sed 's/^..//'|sed 's/.$//'|sed 's/:-/=/'|grep -v VERSION|grep DOCKER|cut -d= -f1|sort|uniq")}}
 ```
 
-------------------------------------------------------------------------------
 
 ### compose.mk
+<hr style="width:100%;border-bottom:3px solid black;">
 
 #### General Environment Variables
+------------------------------------------------------------------------------
 
 {{bash("pattern=Environment ./compose.mk mk.parse.block/compose.mk")}}
 
 #### TUI Environment Variables
+------------------------------------------------------------------------------
 
 {{bash('pattern="TUI Environment" ./compose.mk mk.parse.block/compose.mk')}}
 
@@ -48,8 +54,10 @@ These variables have slightly different values for `compose.mk io.env/TUI` vs `k
 {{bash("./compose.mk io.env/TUI")}}
 ```
 
-------------------------------------------------------------------------------
 
 ### k8s.mk
+<hr style="width:100%;border-bottom:3px solid black;">
 
 The main configuration that's expected with k8s.mk is always `KUBECONFIG`.
+
+<hr style="width:100%;border-bottom:3px solid black;">

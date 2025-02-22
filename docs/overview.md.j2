@@ -1,41 +1,33 @@
 {% import 'macros.j2' as macros -%}
 
-The **k8s-tools suite** aggregates 20+ individual utilities for working with kubernetes into a single dockerized toolchain, and provides a zero-dependency automation framework for extending and interacting it. Project-local clusters, cluster lifecycle automation, customizable TUIs, and more.
-
-{#
-*Meet `compose.mk`, tool / library /framework for makefile-based automation, scripting, and lightweight orchestration.**  Native support for docker, docker-compose, workflow primitives, TUI elements, and more.
-
-Meet **`compose.mk`,** which describes core support for docker, docker-compose, and other extensions for `make`, and **`k8s.mk`,** which uses `compose.mk` to build automation APIs over the `k8s-tools.yml` containers.
-Besides bundling some tooling in k8s-tools.yml, there are 2 other components that can help to build automation.
-
-**The full triple of *k8s.mk*, *compose.mk*, and *k8s-tools.yml* is called the k8s-tools suite.** 
-<strong>`compose.mk` extends `make` to add native support for docker, workflows, TUI elements, and more.</strong>
-
-## Overview
-<hr style="width:95%;border-bottom:1px dashed black;">
-
-#}
-
 {{macros.img_link("e2e-k3d.commander.gif", mkdocs, "90%")}}
 
+## Overview
 <hr style="width:100%;border-bottom:3px solid black;">
 
-## Intro
+The **k8s-tools suite** aggregates 20+ individual utilities for working with kubernetes into a single dockerized toolchain, and provides a zero-dependency automation framework for extending and interacting it. Project-local clusters, cluster lifecycle automation, customizable TUIs, and more.  
+
+This is a sibling project for [compose.mk]({{jinja.vars.composemk_docs_url}}), which is a more general automation framework, and also serves as a reference implementation for extending it.
 
 **k8s-tools** operates at a project-automation layer and is designed to embrace and extend other tools, so it doesn't really conflict or compete with anything.  It's useful for CI/CD pipelines or general development, and is designed to be [embedded alongside existing projects]({{mkdocs.site_relative_url}}/integration).  
+
+### Introduction
+<hr style="width:100%;border-bottom:3px solid black;">
+
+At a high level, the **k8s-tools suite** has 2 main components that can be used individually or together.  Those components are *a collection of tool-container definitions*, and an *automation framework for extending and interacting with the containers*.
+
+--------------------------------
 
 This reference focuses on a few use-cases in particular:
 
 1. **Cluster lifecycle / development / debugging workflows** in general.
-1. **Decoupling project automation** from the choice of CI/CD backend.
 1. **Project-local kubernetes clusters & corresponding lifecycle automation** using `kind` or `k3d`.
-1. **Proper separation of automation tasks** from specifications for runtime / container context.
+1. **Decoupling project automation** from the choice of CI/CD backend.
+1. **Separation of automation tasks** from specifications for runtime / container context.
 1. **Per-project tool-versioning**, providing defaults but allowing overrides, and ensuring versions match everywhere.
 1. **Less shell code in general,** but where we need it: it <u>shouldn't</u> be embedded in YAML, Jenkinsfiles, etc.
 
-<hr style="width:95%;border-bottom:1px dashed black;">
-
-At a high level, the **k8s-tools suite** has 2 main components that can be used individually or together.  Those components are *a collection of tool-container definitions*, and an *automation framework for extending and interacting with the containers*.
+--------------------------------
 
 **[`k8s-tools.yml`]({{mkdocs.site_relative_url}}/features)**
 
@@ -43,17 +35,18 @@ At a high level, the **k8s-tools suite** has 2 main components that can be used 
 
 **[`k8s.mk`]({{mkdocs.site_relative_url}}/k8s.mk)**
 
-:   A library/utility that builds on k8s-tools.yml, providing powerful ways to run automation *inside* tool-containers and script orchestration *across* those tool containers.  As a stand-alone utility, `k8s.mk` can enable interactive workflows like inspection, debugging, and prototyping.  As a library, you can very quickly build on it to express custom project automation that's surprisingly **portable, powerful, and flexible**.
+:   A library/utility that builds on k8s-tools.yml, providing powerful ways to run automation **inside** the tool-containers and script orchestration **across** them.  As a stand-alone utility, `k8s.mk` can enable interactive workflows like inspection, debugging, and prototyping.  As a library, you can very quickly build on it to express custom project automation that's surprisingly **portable, powerful, and flexible**.
 
+### Getting Started 
 <hr style="width:100%;border-bottom:3px solid black;">
 
+Jump directly to [the quickstart]({{mkdocs.site_relative_url}}) if you want to start experimenting, but if you're waiting to learn more about what this project can **do**, start at the [main demo for cluster lifecycle management]({{mkdocs.site_relative_url}}/demos/cluster-lifecycle).
 
 {#
 
 <hr style="width:95%;border-bottom:1px dashed black;">
 
 1. Generally modernizing & extending `make` for containers, colors, & concurrency
-
 
 Amongst other things it can help to fix the problem of different project developers using different local versions of things like `helm`, `kubectl`, etc.
 
@@ -71,4 +64,18 @@ Beyond addressing the issues above, these tools add new capabilities to `make` i
 With or without the TUI, all output is carefully curated and logged to appropriate output streams, aiming to be readable and human-friendly on stderr, while still remaining machine-friendly for downstream processing on stdout.  Help not only *works,* it also goes beyond mere target-listing to actually include namespace and per-target documentation, rendered via a dockerized version of [charmbracelete/glow](https://github.com/charmbracelet/glow).
 
 {{macros.img_link("tui-7.gif", mkdocs, "90%")}}
+#}
+
+{#
+*Meet `compose.mk`, tool / library /framework for makefile-based automation, scripting, and lightweight orchestration.**  Native support for docker, docker-compose, workflow primitives, TUI elements, and more.
+
+Meet **`compose.mk`,** which describes core support for docker, docker-compose, and other extensions for `make`, and **`k8s.mk`,** which uses `compose.mk` to build automation APIs over the `k8s-tools.yml` containers.
+Besides bundling some tooling in k8s-tools.yml, there are 2 other components that can help to build automation.
+
+**The full triple of *k8s.mk*, *compose.mk*, and *k8s-tools.yml* is called the k8s-tools suite.** 
+<strong>`compose.mk` extends `make` to add native support for docker, workflows, TUI elements, and more.</strong>
+
+## Overview
+<hr style="width:95%;border-bottom:1px dashed black;">
+
 #}

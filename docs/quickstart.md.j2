@@ -1,0 +1,93 @@
+## Quickstart
+<br/>
+
+### Test Drive
+<hr style="width:100%;border-bottom:3px solid black;">
+
+```bash
+# for ssh
+$ git clone {{github.repo_ssh_url}}
+
+# or for http
+$ git clone {{github.repo_url}}
+
+# pre-cache the containers
+$ make build 
+
+# run all the demos 
+$ make demos
+```
+
+<br/>
+
+### Integration With Your Project
+<hr style="width:100%;border-bottom:3px solid black;">
+
+Placeholder 
+
+### Embedding Tools
+<hr style="width:100%;border-bottom:3px solid black;">
+
+Placeholder 
+
+{#
+You'll probably want to read over the [compose.mk]({{mkdocs.site_relative_url}}/compose.mk) section to really understand what's going on here.  In case you've already seen it though, here's the quick start with the copy/paste stuff.
+
+First, copy the files from this repo into your project:
+
+```bash
+$ cd myproject 
+
+# Download the compose file with the tool containers
+$ curl -sL \
+  {{github.raw_url}}/master/k8s-tools.yml \
+    > k8s-tools.yml
+
+# Download the compose.mk automation lib
+$ curl -sL \
+  {{github.raw_url}}/master/compose.mk \
+    > compose.mk
+
+# Download the k8s.mk automation lib.
+$ curl -sL \
+  {{github.raw_url}}/master/k8s.mk \
+    > k8s.mk
+
+```
+
+These 3 files are usually working together, but in some cases they are useful in a stand-alone mode.  Make them all executable like this:
+
+```bash
+$ chmod ugo+x k8s-tools.yml compose.mk k8s.mk
+
+# equivalent to `make -f k8s.mk ..`
+./k8s.mk ... 
+
+# equivalent to `make -f compose.mk ..`
+$ ./compose.mk ... 
+
+# equivalent to `docker compose -f k8s-tools.yml run ...`
+$ ./k8s-tools.yml run ...
+```
+
+That's all the setup you'll need just for using tools directly.  See the next section for more information/examples re: stand-alone mode.
+
+If you're interested in tighter integration like setting up the [Make/Compose bridge]({{mkdocs.site_relative_url}}/compose.mk#makecompose-bridge) or preparing for [Container Dispatch]({{mkdocs.site_relative_url}}/compose.mk#container-dispatch), here's a quick example of what your project Makefile should look like:
+
+```Makefile
+# myproject/Makefile (Make sure you have real tabs, not spaces!)
+ 
+# Include/invoke the target-building macros 
+# somewhere near the top of your existing boilerplate
+include compose.mk
+$(eval $(call compose.import, ▰, TRUE, k8s-tools.yml))
+
+# At this point, targets are defined for whatever services
+# are mentioned in the external compose config, and they are
+# ready to use. Now you can dispatch any task to any container!
+test: ▰/k8s/self.test
+self.test:
+  kubectl --version
+  echo hello world from `uname -n -v`
+```
+#}

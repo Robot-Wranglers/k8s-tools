@@ -1,3 +1,4 @@
+#!/usr/bin/env -S make -f
 # demos/cluster-lifecycle.mk: 
 #   Demonstrating full cluster lifecycle automation with k8s-tools.git.
 #   This exercises `compose.mk`, `k8s.mk`, plus the `k8s-tools.yml` services to 
@@ -10,23 +11,22 @@
 #   USAGE: 
 #
 #     # Default entrypoint runs clean, create, deploy, test, but does not tear down the cluster.  
-#     make -f demos/cluster-lifecycle.mk
+#     ./demos/cluster-lifecycle.mk
 #
 #     # End-to-end, again without teardown 
-#     make -f demos/cluster-lifecycle.mk clean create deploy test
+#     ./demos/cluster-lifecycle.mk clean create deploy test
 #
 #     # Interactive shell for a cluster pod
-#     make -f demos/cluster-lifecycle.mk cluster.shell 
+#     ./demos/cluster-lifecycle.mk cluster.shell 
 #
 #     # 
-#     make -f demos/cluster-lifecycle.mk cluster.show
+#     ./demos/cluster-lifecycle.mk cluster.show
 #
 #     # Finally, teardown the cluster
-#     make -f demos/cluster-lifecycle.mk teardown
+#     ./demos/cluster-lifecycle.mk teardown
 
+include compose.mk 
 include k8s.mk
-
-.DEFAULT_GOAL := all 
 
 # Override k8s-tools.yml service-defaults, 
 # explicitly setting the k3d version used
@@ -46,124 +46,87 @@ export POD_NAME?=test-harness
 export POD_NAMESPACE?=default
 
 # Generate target-scaffolding for k8s-tools.yml services
-$(eval $(call compose.import, ▰, TRUE, k8s-tools.yml))
+$(eval $(call compose.import, k8s-tools.yml, ▰))
 
-# Default target should do everything, end to end.
-all: flux.and/clean,create,deploy,test
+__main__: flux.and/clean,create,deploy,test
 
 ###############################################################################
 
-# Top level public targets for cluster operations, 
-# plus (optional) convenience-aliases and stage-labels.
-
-# These run private subtargets inside the named  tool containers (i.e. `k3d`).
-clean cluster.clean: flux.stage/cluster.clean ▰/k3d/self.cluster.clean
+clean cluster.clean: flux.stage/cluster.clean k3d.dispatch/k3d.cluster.delete/$${CLUSTER_NAME}
 create cluster.create: \
 	flux.stage/cluster.create \
-	▰/k3d/self.cluster.maybe.create
+	k3d.dispatch/self.cluster.maybe.create
 teardown: flux.stage/cluster.teardown cluster.teardown
 
-# Plus a convenience alias to wait for all pods in all namespaces.
 wait cluster.wait: k8s.cluster.wait
 self.cluster.maybe.create: flux.do.unless/self.cluster.create,self.cluster.exists
-# Private targets for low-level cluster-ops.
-# Host has no `k3d` command, so these targets
-# run inside the `k3d` service from k8s-tools.yml
-#  ./compose.mk flux.do.unless/<umbrella>,<dry>
 self.cluster.exists: k3d.has_cluster/$${CLUSTER_NAME}
-self.cluster.create: 
-	k3d cluster create $${CLUSTER_NAME} \
-	--servers 3 --agents 3 \
-	--api-port 6551 --port '8080:80@loadbalancer' \
-	--volume $$(pwd)/:/$${CLUSTER_NAME}@all --wait
-# k3d.	
-self.cluster.clean: k3d.cluster.delete/$${CLUSTER_NAME}
+self.cluster.create: k3d.cluster.get_or_create/$${CLUSTER_NAME}
 
 ###############################################################################
 
-# Top level public targets for deployments & (optional) convenience-aliases and stage-labels.
-# These run private subtargets inside the named  tool containers (i.e. `helm`, and `k8s`).
 deploy cluster.deploy: \
 	flux.stage/cluster.deploy \
 	flux.loop.until/k8s.cluster.ready \
 	deploy.helm deploy.test_harness deploy.prometheus
 	# add a label to the default namespace
 	key=manager val=k8s.mk ${make} k8s.namespace.label/${POD_NAMESPACE}
+
 deploy.prometheus:
-	${jb} wait=yes \
-		create_namespace=yes \
-		chart_ref=prometheus \
-		chart_version=25.24.1 \
-		name=prometheus-community \
-		release_namespace=prometheus \
+	${json.from} name=prometheus-community \
+		chart_ref=prometheus chart_version=25.24.1 \
+		release_namespace=prometheus create_namespace=yes wait=yes \
 		chart_repo_url="https://prometheus-community.github.io/helm-charts" \
 	| ${make} ansible.helm
+
 fwd.grafana:
 	mapping="80:8081" ${make} kubefwd.start/prometheus/grafana
-	$(call log, ${GLYPH_DOCKER} looking up grafana password) 
-	grafana_password=`kubectl get secret --namespace prometheus grafana -o jsonpath="{.data.admin-password}"|base64 --decode` \
+	$(call log.k8s, looking up grafana password) 
+	grafana_password=`kubectl get secret --namespace prometheus grafana -o jsonpath="{.data.admin-password}"\
+	| base64 --decode` \
 	&& printf "http://admin:$${grafana_password}@grafana:8081\n"
 	
 deploy.grafana:
-	printf "\
-		wait=yes \
-		name=grafana \
-		chart_ref=grafana \
-		create_namespace=yes \
-		values:raw='{\"adminPassword\":\"test\"}' \
-		release_namespace=prometheus \
-		chart_repo_url=https://grafana.github.io/helm-charts" \
-	| ${make} jb \
+	${json.from} \
+		name=grafana chart_ref=grafana \
+		wait=yes values:raw='{"adminPassword":"test"}' \
+		create_namespace=yes release_namespace=prometheus \
+		chart_repo_url=https://grafana.github.io/helm-charts \
 	| ${make} ansible.helm
 	
-deploy.helm: ▰/helm/self.cluster.deploy_helm_example io.time.wait/5
-deploy.test_harness: flux.retry/3/▰/k8s/self.test_harness.deploy
+deploy.helm:
+	${json.from} name=ahoy chart_ref=hello-world \
+		release_namespace=default chart_repo_url="https://helm.github.io/examples" \
+	| ${make} ansible.helm io.time.wait/5
 
-# Private targets with the low-level details for what to do in tool containers. 
-# You can expand this to include usage of `kustomize`, etc. Volumes are already setup,
-# so you can `kubectl apply` from the filesystem.  You can also call anything documented 
-# in the API[1] https://github.com/robot-wranglers/k8s-tools/tree/master/docs/api/#k8smk.
-self.cluster.deploy_helm_example: 
-	@# Idempotent version of a helm install.
-	@# Commands are inlined directly below for clarity, 
-	@# but see also 'helm.repo.add', 'helm.chart.install', 
-	@# and 'ansible.helm' for more advanced built-in helpers.
-	set -x \
-	&& (helm repo list 2>/dev/null | grep examples || helm repo add examples ${HELM_REPO} ) \
-	&& (helm list | grep hello-world || helm install ahoy ${HELM_CHART})
+deploy.test_harness: flux.retry/3/k8s.dispatch/self.test_harness.deploy
+self.test_harness.deploy: \
+	k8s.kubens.create/${POD_NAMESPACE} \
+	k8s.test_harness/${POD_NAMESPACE}/${POD_NAME} \
+	k8s.kubectl.apply/demos/data/nginx.svc.yml
 
-# We stood up the test-harness with the 'k8s.test_harness' target,
-# and stood up nginx with plain kubectl.  Let's tear down with 
-# ansible to mix it up.
 cluster.teardown:
-	${jb} wait=yes kind=Pod state=absent name=test-harness namespace=default \
+	${json.from} wait=yes kind=Pod state=absent name=${POD_NAME} namespace=${POD_NAMESPACE} \
 	| ${make} k8s.ansible
-	${jb} wait=true name=ahoy state=absent release_namespace=default \
+	${json.from} wait=true name=ahoy state=absent release_namespace=default \
 	| ${make} ansible.helm 
-
-# Prerequisites up top create & activate the `default` namespace 
-# and then deploy a pod named `test-harness` into it, using a default image.
-# In the body, we'll use kubectl directly to deploy a simple service into the default namespace.
-self.test_harness.deploy: k8s.kubens.create/${POD_NAMESPACE} k8s.test_harness/${POD_NAMESPACE}/${POD_NAME} 
-	ls demos/data/nginx.svc.yml \
-	&& kubectl apply -f demos/data/nginx.svc.yml
 
 ###############################################################################
 
 test: test.cluster test.contexts 
 test.cluster cluster.test: flux.stage/cluster.test cluster.wait
-	label="Showing kubernetes status" ${make} io.gum.style 
-	${make} k8s/dispatch/k8s.stat 
-	label="Previewing topology for default namespace" ${make} io.gum.style 
-	size=40x ${make} k8s.graph.tui/default/pod
-	label="Previewing topology for kube-system namespace" ${make} io.gum.style 
-	${make} k8s.graph.tui/kube-system/pod
-	label="Previewing topology for prometheus namespace" ${make} io.gum.style 
-	${make} k8s.graph.tui/prometheus/pod
+	label="Showing kubernetes status" \
+		${make} io.print.banner k8s.stat 
+	label="Previewing topology for default namespace" \
+		${make} io.print.banner k8s.graph.tui/default/pod
+	label="Previewing topology for kube-system namespace" \
+		${make} io.print.banner k8s.graph.tui/kube-system/pod
+	label="Previewing topology for prometheus namespace" \
+		${make} io.print.banner k8s.graph.tui/prometheus/pod
 
 test.contexts: 
 	@# Helpers for displaying platform info 
-	label="Demo pod connectivity" ${make} io.gum.style 
+	label="Demo pod connectivity" ${make} io.print.banner 
 	${make} get.compose.ctx get.pod.ctx 
 
 get.compose.ctx:
@@ -172,15 +135,8 @@ get.compose.ctx:
 
 get.pod.ctx:
 	@# Runs inside the kubernetes cluster
-	echo uname -n | ${make} k8s.shell/default/test-harness/pipe
+	echo uname -n | ${make} k8s.shell/${POD_NAMESPACE}/${POD_NAME}/pipe
 
 ###############################################################################
 
-# Interactive shell for the test-harness pod 
-# (See the 'deploy' steps for the setup of same)
 cluster.shell: k8s.shell/${POD_NAMESPACE}/${POD_NAME}
-
-# TUI for browsing the cluster 
-cluster.show: k3d.commander
-
-###############################################################################

@@ -1,3 +1,4 @@
+#!/usr/bin/env -S make -f
 ##
 # TUI test suite for compose.mk 
 #

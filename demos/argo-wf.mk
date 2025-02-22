@@ -1,3 +1,4 @@
+#!/usr/bin/env -S make -f
 ####################################################################################
 # demos/argo-wf.mk: 
 #   Automation for a self-contained argo-workflows cluster with k8s-tools.git.

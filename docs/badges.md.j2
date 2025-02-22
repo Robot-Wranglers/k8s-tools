@@ -1,0 +1,2 @@
+{% import 'macros.j2' as macros -%}
+&nbsp;{% for action in github.actions %}<a href="{{action.url}}"><img src="{{action.url}}/badge.svg"></a>{%endfor%}&nbsp;
