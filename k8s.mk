@@ -300,28 +300,84 @@ ansible.run/%: .ansible.require
 ## DOCS: 
 ##   [1] https://robot-wranglers.github.io/k8s-tools/api#api-helm
 #░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
-
-helm.repo.add/%:
-	@# Idempotent version of `helm repo add`
+helm.chart.install:
 	@#
-	@# See also the 'ansible.helm' target.
+	@#
+	@#
+	@#
+	header="${GLYPH_K8S} helm.chart.install ${sep} ${bold}$${name} ${sep} ${no_ansi_dim}$${chart_ref}" \
+	&& $(call log.part1, $${header} ) \
+	&& ${make} helm.release.stat/$${name} 2>/dev/null \
+	; case $$? in \
+		0) ($(call log.part2, ${dim_green}ok); ${make} helm.release.status/$${name} );; \
+		*) ($(call log.part2, ${dim_ital}missing) \
+			&& ${trace_maybe} && helm install $${name} $${chart_ref} -o json | jq .info);; \
+	esac
+
+helm.repo.require/%:
+	@# Add the named helm repository iff it's missing.
 	@#
 	@# USAGE:
-	@#   ./k8s.mk helm.repo.add/<repo_name> url=<repo_url>
-	@#  
-	set -x \
-	&& (helm repo list 2>/dev/null | grep ${*}) \
-	|| helm repo add ${*} $${url} 
+	@#  url=<repo_url> ./k8s.mk helm.repo.require/<name>
+	header="${GLYPH_K8S} helm.repo.require ${sep}" \
+	&& $(call log, $${header} ${dim}${bold}${*} ${sep} ${dim_ital}$${url:-no URL given})
+	helm repo list -o json | jq -e -r '.[].name' 2>/dev/null | grep -w ${*} || (helm repo add ${*} $${url} | ${stream.dim.indent.stderr})
 
-helm.chart.install/%:
-	@# Idempotent version of a 'helm install'
+helm.release.status/%:
+	@# Interface to `helm status`, this returns information for the given release.
+	@# Always returns JSON.  Not strict: no error will be 
+	@# thrown in case the repo doesn't exist.
 	@#
 	@# USAGE:
-	@#   ./k8s.mk helm.chart.install/<name> chart=<chart>
-	@#  
-	set -x \
-	&& ( helm list | grep ${*} ) \
-	|| helm install ${*} $${chart}
+	@#  ./k8s.mk helm.status/<release_name>
+	@#
+	header="${GLYPH_K8S} helm.release.status ${sep} ${bold}${*} ${sep}" \
+	&& $(call io.mktemp) \
+	&& helm status ${*} -o json 2>/dev/null | jq .info > $${tmpf} \
+	&& case `cat $${tmpf}` in \
+		"") $(call log,$${header} ${dim_ital}no such release!);; \
+		*) cat $${tmpf}| jq . ;; \
+	esac
+helm.release.stat/%:
+	@# Like `helm.status`, but strict and quiet for use with conditionals.
+	@# Result status is an error if the given repo name doesnt exist 
+	@#
+	@# USAGE:
+	@#  ./k8s.mk helm.stat/<release_name>
+	@#
+	header="${GLYPH_K8S} helm.release.stat ${sep} ${bold}${*} ${sep}" \
+	&& $(call log.trace,$${header} ${dim_ital} asserting release exists..) \
+	&& ${make} helm.release.status/${*} 2>/dev/null| jq -e . >/dev/null
+helm.release.present/%: ; ${make} helm.release.stat/${*} >/dev/null
+helm.release.missing/%: ; ${make} flux.negate/helm.release.present/${*}
+
+# helm.repo.list=helm repo list -o json
+# helm.repo.names:; ${helm.repo.list} | jq -r '.[].name' | xargs -n1
+# helm.repo.add/%: 
+# 	@# Idempotent version of `helm repo add`
+# 	@#
+# 	@# See also the 'ansible.helm' target.
+# 	@#
+# 	@# USAGE:
+# 	@#   ./k8s.mk helm.repo.add/<repo_name> url=<repo_url>
+# 	@#  
+# 	$(call log.target)
+# 	${trace_maybe} \
+# 	${jb} name=${*} repo_url="$${url}" \
+# 		| ${make} ansible.adhoc/kubernetes.core.helm_repository
+# helm.chart.install/%:
+# 	@# Idempotent version of a 'helm install'
+# 	@#
+# 	@# USAGE:
+# 	@#   ./k8s.mk helm.chart.install/<name> chart=<chart>
+# 	@#  
+# 	${trace_maybe} \
+	
+# 	${jb} name=${*} repo_url="$${url}" \
+# 		| ${make} ansible.adhoc/kubernetes.core.helm_repository
+	
+# 	&& ( helm list | grep ${*} ) \
+# 	|| helm install ${*} $${chart}
 
 #░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 ## END: helm.* targets
@@ -339,9 +395,29 @@ helm.chart.install/%:
 
 # Geometry for k3d.commander
 GEO_K3D="5b40,111x56,0,0[111x41,0,0{55x41,0,0,1,55x41,56,0[55x16,56,0,2,55x24,56,17,3]},111x14,0,42{55x14,0,42,4,55x14,56,42,5}]"
-
+io.curl=curl -sSL
 k3d.cluster.exists/% k3d.has_cluster/%:; k3d cluster list | grep ${*}
-k3d.cluster_missing/%:; ${make} flux.negate/k3d.has_cluster/${*}
+k3d.cluster.get_or_create/%:
+	@#
+	@#
+	@#
+	@#
+	$(call log,${GLYPH_K8S} k3d.cluster.get_or_create ${sep} ${bold}${*})
+	${make} flux.do.unless/k3d.cluster.create/${*},k3d.has_cluster/${*}
+k3d.cluster.create/%:
+	@#
+	@#
+	@#
+	@#
+	$(call log,${GLYPH_K8S} k3d.cluster.create ${sep} ${bold}${*})
+	set -x && k3d cluster create ${*} \
+	--servers $${servers:-3} \
+	--agents $${agents:-3} \
+	--api-port $${api_port:-6551} \
+	--port "$${port:-12000:12000@agent:0}" \
+	--volume $$(pwd)/:/${*}@all --wait
+
+# k3d.cluster.missing/%:; ${make} flux.negate/k3d.has_cluster/${*}
 
 k3d.cluster.delete/%:
 	@# Idempotent version of k3d cluster delete 
@@ -542,6 +618,38 @@ k8s.graph.tui/%:
 			--center=on $${clear:-} $${outfile}
 .k8s.graph.tui.clear/%:; clear="--clear" ${make} .k8s.graph.tui/${*}
 
+argo.submit.url:
+	$(call log, ${GLYPH_K8S} ${@} ${sep} ${cyan_flow_left})
+	${io.curl} $${url} | ${make} argo.submit.stdin
+
+argo.submit.stdin stream.argo.submit :
+	@#
+	@#
+	@#
+	$(call log, ${GLYPH_K8S} ${@} ${sep} ${cyan_flow_left})
+	${stream.peek} | ${make} argo.submit/-
+
+argo.submit/%:
+	@#
+	@#
+	@#
+	$(call log, ${GLYPH_K8S} ${@} ${sep} ${cyan_flow_left})
+	log="--log" \
+	&& wait=`[ -z $${wait:-} ] && true || echo "--wait"` \
+	&& case ${*} in \
+		-) path=/dev/stdin;; \
+		*) path=${*};; \
+	esac \
+	&& set -x && argo submit $${log} $${wait} $${path}
+
+kubectl.apply.stdin:
+	@#
+	@#
+	@#
+	@#
+	$(call log, ${GLYPH_K8S} ${@} ${sep} ${cyan_flow_left})
+	${stream.stdin} | yq . -o json | ${stream.peek} | kubectl apply -f - 
+
 k8s.help:; ${make} mk.namespace.filter/k8s.
 	@# Shows targets for just the 'k8s' namespace.
 
@@ -553,7 +661,8 @@ k8s.kubens/%:
 	@# USAGE:  
 	@#   ./k8s.mk k8s.kubens/<namespace>
 	@#
-	TERM=xterm kubens ${*} 2>&1 > ${stderr}
+	$(call log,${GLYPH_K8S} k8s.kubens ${sep} ${dim}${*}) \
+	&& TERM=xterm kubens ${*} 2>&1 | ${stream.dim.indent.stderr}
 
 k8s.kubens.create/%:; ${make} k8s.namespace.create/${*} k8s.kubens/${*}
 	@# Context-manager.  Activates the given namespace, creating it first if necessary.
@@ -575,14 +684,15 @@ k8s.namespace/%:; ${make} k8s.kubens/${*}
 	
 
 k8s.namespace.create/%:
-	@# Idempotent version of namespace-create
+	@# Idempotent version of namespace-create.
 	@#
 	@# USAGE: 
 	@#    k8s.namespace.create/<namespace>
 	@#
+	$(call log, ${GLYPH_K8S} k8s.namespace.create ${sep} ${bold}${*} ${sep} )
 	kubectl create namespace ${*} \
 		--dry-run=client -o yaml \
-	| kubectl apply -f - \
+	| ${stream.peek} | kubectl apply -f - \
 	2>&1
 
 k8s.namespace.label/%:
@@ -722,7 +832,7 @@ k8s.cluster.ready k8s.ready:
 			| sed "s/ImagePullBackOff/$(shell printf "${yellow}ImagePullBackOff${no_ansi}")/g" \
 			| sed ':a;N;$$!ba;s/\n\n/\n/g' \
 			| tr '☂' '\n' 2>/dev/null | ${stream.dim} > ${stderr} \
-		&& $(call log, $${header} ${sep}${dim} $${stamp} ${sep} ${bold}Pods aren't ready yet) \
+		&& printf '\n'>/dev/stderr && $(call log, $${header} ${sep}${dim} $${stamp} ${sep} ${bold}Pods aren't ready yet) \
 		&& eval $${wait_cmd}; \
 	done \
 	&& tmp=`[ "${*}" == "all" ] && echo Cluster || echo Namespace` \

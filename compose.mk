@@ -1751,7 +1751,7 @@ flux.wrap/%:
 flux.apply/% flux.and/%:
 	@# Performs an 'and' operation with the named comma-delimited targets.
 	@# This is equivalent to the default behaviour of `make t1 t2 .. tN`.
-	@# This is mostly used as a wrapper in case targets are unary.
+	@# This is mostly used as a wrapper in case arguments are unary.
 	@#
 	@# See also 'flux.or'.
 	@#
@@ -1884,14 +1884,15 @@ flux.if.then/%:
 	&& _if=`printf "${*}"|cut -s -d, -f1` \
 	&& _then=`printf "${*}"|cut -s -d, -f2-` \
 	&& header="${GLYPH_FLUX} flux.if.then ${sep}${dim}" \
-	&& $(call log, $${header} ${ital}$${_if}${no_ansi} ${sep} ${dim}${bold}$${_then}) \
+	&& $(call log.part1, $${header} if//${ital}$${_if}${no_ansi} ) \
 	&& case $${verbose:-0} in \
 		0) ${make} $${_if} 2>/dev/null; st=$$?; ;; \
 		*) ${make} $${_if}; st=$$?; ;; \
 	esac \
 	&& case $${st} in \
-		0) $(call log.trace, $${header} ${yellow}(Condition ok)); ${make} $${_then}; ;; \
-		*) $(call log.trace, $${header} ${yellow}(Condition failed)); ;; \
+		0) ($(call log.part2, ${dim_green}true${no_ansi_dim}) \
+			; $(call log, $${header} then//${dim_cyan}$${_then}); ${make} $${_then}); ;; \
+		*) $(call log.part2, ${yellow}false${no_ansi_dim}); ;; \
 	esac
 stream.obliviate=${all_devnull}
 flux.if.then.else/%:
@@ -1905,7 +1906,7 @@ flux.if.then.else/%:
 	&& _else=`printf "${*}"|cut -s -d, -f3-` \
 	&& header="${GLYPH_FLUX} flux.if.then.else ${sep}${dim} testing ${dim_ital}$${_if} " \
 	&& $(call log.part1, $${header}) \
-	&& ${make} $${_if} ${stream.obliviate} \
+	&& ${make} $${_if} 2>&1 > /dev/null \
 	; case $${?} in \
 		0) $(call log.part2, ${dim_green}true${no_ansi_dim} - dispatching ${dim_cyan}$${_then}) ; ${make} $${_then};; \
 		*) $(call log.part2, ${yellow}false${no_ansi_dim} - dispatching ${dim_cyan}$${_else}); ${make} $${_else};; \

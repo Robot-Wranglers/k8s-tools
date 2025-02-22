@@ -59,6 +59,7 @@ services:
         RUN cp /home/${DOCKER_UGNAME:-root}/.krew/bin/* /usr/bin
         RUN chown -R ${DOCKER_UID:-1000}:${DOCKER_GID:-1000} /home/${DOCKER_UGNAME:-root}/
         RUN curl -sL https://raw.githubusercontent.com/holman/spark/master/spark -o /usr/bin/spark && chmod +x /usr/bin/spark
+        RUN apk --no-cache add docker
         USER ${DOCKER_UGNAME:-root}
         ENV PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/home/${DOCKER_UGNAME:-root}/.krew/bin
     # NB: Left for reference, and possibly required by older versions of docker or certain configurations?  

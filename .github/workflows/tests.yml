@@ -28,8 +28,10 @@ jobs:
       #   run: sudo apt-get install -y bash make
       # - name: Integration Tests
       #   run: make smoke-test || true
-      - name: Cluster Lifecycle Demo
-        run: make -f demos/cluster-lifecycle.mk
+      # - name: Cluster Lifecycle Demo
+      #   run: make -f demos/cluster-lifecycle.mk
+      - name: ArgoWF Demo
+        run: make -f demos/argo-wf.mk
         # run: make -f demos/cluster-lifecycle.mk || true
       # - name: TUI Tests
       #   shell: 'script -q -e -c "bash --noprofile --norc -eo pipefail {0}"'

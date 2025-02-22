@@ -58,24 +58,24 @@ all: flux.and/clean,create,deploy,test
 
 # These run private subtargets inside the named  tool containers (i.e. `k3d`).
 clean cluster.clean: flux.stage/cluster.clean ▰/k3d/self.cluster.clean
-create cluster.create: flux.stage/cluster.create ▰/k3d/self.cluster.create
+create cluster.create: \
+	flux.stage/cluster.create \
+	▰/k3d/self.cluster.maybe.create
 teardown: flux.stage/cluster.teardown cluster.teardown
 
 # Plus a convenience alias to wait for all pods in all namespaces.
 wait cluster.wait: k8s.cluster.wait
-
+self.cluster.maybe.create: flux.do.unless/self.cluster.create,self.cluster.exists
 # Private targets for low-level cluster-ops.
 # Host has no `k3d` command, so these targets
 # run inside the `k3d` service from k8s-tools.yml
 #  ./compose.mk flux.do.unless/<umbrella>,<dry>
-self.cluster.create: flux.do.unless/.self.cluster.create/$${CLUSTER_NAME},k3d.has_cluster/$${CLUSTER_NAME}
-# ( k3d cluster list | grep $${CLUSTER_NAME} \
-#   || ${make} .self.cluster.create )
-.self.cluster.create/%:
-	k3d cluster create ${*} \
+self.cluster.exists: k3d.has_cluster/$${CLUSTER_NAME}
+self.cluster.create: 
+	k3d cluster create $${CLUSTER_NAME} \
 	--servers 3 --agents 3 \
 	--api-port 6551 --port '8080:80@loadbalancer' \
-	--volume $$(pwd)/:/${*}@all --wait
+	--volume $$(pwd)/:/$${CLUSTER_NAME}@all --wait
 # k3d.	
 self.cluster.clean: k3d.cluster.delete/$${CLUSTER_NAME}
 
