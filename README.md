@@ -1,2 +1,3 @@
-# k8s-tools
-Completely dockerized version of a kubernetes toolchain and an approach for extending and automating it.
+&nbsp;<a href="https://github.com/Robot-Wranglers/k8s-tools/actions/workflows/tests.yml"><img src="https://github.com/Robot-Wranglers/k8s-tools/actions/workflows/tests.yml/badge.svg"></a><a href="https://github.com/Robot-Wranglers/k8s-tools/actions/workflows/cluster-lifecycle.yml"><img src="https://github.com/Robot-Wranglers/k8s-tools/actions/workflows/cluster-lifecycle.yml/badge.svg"></a><a href="https://github.com/Robot-Wranglers/k8s-tools/actions/workflows/docs.yml"><img src="https://github.com/Robot-Wranglers/k8s-tools/actions/workflows/docs.yml/badge.svg"></a>&nbsp; 
+
+See the main documentation: [https://robot-wranglers.github.io/k8s-tools/](https://robot-wranglers.github.io/k8s-tools/)

@@ -1,3 +1,4 @@
+#!/usr/bin/env -S make -f
 # demos/cluster-lifecycle.mk: 
 #   Demonstrating full cluster lifecycle automation with k8s-tools.git.
 #   This exercises `compose.mk`, `k8s.mk`, plus the `k8s-tools.yml` services to 
@@ -10,23 +11,22 @@
 #   USAGE: 
 #
 #     # Default entrypoint runs clean, create, deploy, test, but does not tear down the cluster.  
-#     make -f demos/cluster-lifecycle.mk
+#     ./demos/cluster-lifecycle.mk
 #
 #     # End-to-end, again without teardown 
-#     make -f demos/cluster-lifecycle.mk clean create deploy test
+#     ./demos/cluster-lifecycle.mk clean create deploy test
 #
 #     # Interactive shell for a cluster pod
-#     make -f demos/cluster-lifecycle.mk cluster.shell 
+#     ./demos/cluster-lifecycle.mk cluster.shell 
 #
 #     # 
-#     make -f demos/cluster-lifecycle.mk cluster.show
+#     ./demos/cluster-lifecycle.mk cluster.show
 #
 #     # Finally, teardown the cluster
-#     make -f demos/cluster-lifecycle.mk teardown
+#     ./demos/cluster-lifecycle.mk teardown
 
+include compose.mk 
 include k8s.mk
-
-.DEFAULT_GOAL := all 
 
 # Override k8s-tools.yml service-defaults, 
 # explicitly setting the k3d version used
@@ -44,12 +44,13 @@ export HELM_REPO:=https://helm.github.io/examples
 export HELM_CHART:=examples/hello-world
 export POD_NAME?=test-harness
 export POD_NAMESPACE?=default
+export banner_target?=io.print.banner
 
 # Generate target-scaffolding for k8s-tools.yml services
-$(eval $(call compose.import, ▰, TRUE, k8s-tools.yml))
+$(eval $(call compose.import, k8s-tools.yml, ▰))
 
 # Default target should do everything, end to end.
-all: flux.and/clean,create,deploy,test
+__main__: flux.and/clean,create,deploy,test
 
 ###############################################################################
 
@@ -76,7 +77,6 @@ self.cluster.create:
 	--servers 3 --agents 3 \
 	--api-port 6551 --port '8080:80@loadbalancer' \
 	--volume $$(pwd)/:/$${CLUSTER_NAME}@all --wait
-# k3d.	
 self.cluster.clean: k3d.cluster.delete/$${CLUSTER_NAME}
 
 ###############################################################################
@@ -113,7 +113,7 @@ deploy.grafana:
 		values:raw='{\"adminPassword\":\"test\"}' \
 		release_namespace=prometheus \
 		chart_repo_url=https://grafana.github.io/helm-charts" \
-	| ${make} jb \
+	| ${jb}
 	| ${make} ansible.helm
 	
 deploy.helm: ▰/helm/self.cluster.deploy_helm_example io.time.wait/5
@@ -152,18 +152,18 @@ self.test_harness.deploy: k8s.kubens.create/${POD_NAMESPACE} k8s.test_harness/${
 
 test: test.cluster test.contexts 
 test.cluster cluster.test: flux.stage/cluster.test cluster.wait
-	label="Showing kubernetes status" ${make} io.gum.style 
-	${make} k8s/dispatch/k8s.stat 
-	label="Previewing topology for default namespace" ${make} io.gum.style 
+	# label="Showing kubernetes status" ${make} io.print.banner 
+	# ${make} k8s.dispatch/k8s.stat 
+	label="Previewing topology for default namespace" ${make} io.print.banner
 	size=40x ${make} k8s.graph.tui/default/pod
-	label="Previewing topology for kube-system namespace" ${make} io.gum.style 
+	label="Previewing topology for kube-system namespace" ${make} io.print.banner
 	${make} k8s.graph.tui/kube-system/pod
-	label="Previewing topology for prometheus namespace" ${make} io.gum.style 
+	label="Previewing topology for prometheus namespace" ${make} io.print.banner
 	${make} k8s.graph.tui/prometheus/pod
 
 test.contexts: 
 	@# Helpers for displaying platform info 
-	label="Demo pod connectivity" ${make} io.gum.style 
+	label="Demo pod connectivity" ${make} io.print.banner 
 	${make} get.compose.ctx get.pod.ctx 
 
 get.compose.ctx:
@@ -183,4 +183,3 @@ cluster.shell: k8s.shell/${POD_NAMESPACE}/${POD_NAME}
 # TUI for browsing the cluster 
 cluster.show: k3d.commander
 
-###############################################################################

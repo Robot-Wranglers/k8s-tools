@@ -1,4 +1,8 @@
-## Integration With Your Project
+## Integration
+<br/>
+
+### Integration With Your Project
+<hr style="width:100%;border-bottom:3px solid black;">
 
 The k8s-tools suite can be integrated with your project in a few ways, either with some kind of [global compose file and global aliases](#tools-via-simple-aliases) (*not recommended*), or with [a more project-based approach](#embedding-tools-with-makefiles).  
 
@@ -11,7 +15,9 @@ Platforms used in development include modern docker (say `25+`), make (`3.8+`), 
 
 In general, *the goal is to support most things you'll encounter in the wild*, including OSX, out of the box.  But you may see some of the usual problems with certain arguments to non-posix OSX default `sed` / `ps` / `xargs`, etc.  Please report issues!
 #}
+
 ### Tools Via Simple Aliases
+<hr style="width:100%;border-bottom:3px solid black;">
 
 The simplest and most global way to use k8s-tools.yml is to just download it and setup shell aliases, ignoring `compose.mk` and `k8s.mk`.  Not generally recommended, since this is the least project-based, least portable thing you can do. 
 
@@ -29,6 +35,7 @@ $ helm ....
  It's not bad for experiments, but *don't write scripts based on this an expect to ship them to coworkers or build bots!*  Aliases need their own install-script or install instructions, and tend to be fragile, for example the above approach will break if you move your `myproject` folder around.  **See the next sections for something that is both more flexible and more durable.**
 
 ### Embedding Tools With Makefiles
+<hr style="width:100%;border-bottom:3px solid black;">
 
 You'll probably want to read over the [compose.mk]({{mkdocs.site_relative_url}}/compose.mk) section to really understand what's going on here.  In case you've already seen it though, here's the quick start with the copy/paste stuff.
 

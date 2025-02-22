@@ -1,9 +1,0 @@
-##
-# cm-tools.yml:
-#   compose file faking a suite of config-management and iac tooling
-##
-services:
-  chef: 
-    image: debian 
-  terraform:
-    image: debian 

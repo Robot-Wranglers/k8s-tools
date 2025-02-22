@@ -45,21 +45,21 @@ services:
         FROM ${ALPINE_K8S_VERSION:-alpine/k8s:1.30.0} 
         COPY --from=gum /usr/local/bin/gum /usr/bin
         COPY --from=builder /usr/bin/krew /usr/bin/
-        RUN apk --no-cache add procps make ncurses shadow coreutils pv uuidgen
+        RUN apk --no-cache add -q procps make ncurses shadow coreutils pv uuidgen
         RUN echo ${DOCKER_GID:-1000} && getent group ${DOCKER_GID:-1000} \
           || groupadd --gid ${DOCKER_GID:-1000} docker
         RUN getent passwd ${DOCKER_UGNAME:-root} || \
           useradd --uid ${DOCKER_UID:-1000} --create-home \
           -g ${DOCKER_GID:-1000} ${DOCKER_UGNAME:-root}
         RUN mkdir -p /home/${DOCKER_UGNAME:-root}/.kube /home/${DOCKER_UGNAME:-root}/.krew /home/${DOCKER_UGNAME:-root}/.config
-        RUN KREW_ROOT=/home/${DOCKER_UGNAME:-root}/.krew krew install ctx ns graph sick-pods ktop 
-        RUN KREW_ROOT=/home/${DOCKER_UGNAME:-root}/.krew krew install ${KREW_PLUGINS:-ctx}
+        RUN KREW_ROOT=/home/${DOCKER_UGNAME:-root}/.krew krew install ctx ns graph sick-pods ktop 2>/dev/null
+        RUN KREW_ROOT=/home/${DOCKER_UGNAME:-root}/.krew krew install ${KREW_PLUGINS:-ctx} 2>/dev/null
         RUN cp /home/${DOCKER_UGNAME:-root}/.krew/bin/kubectl-ns /usr/bin/kubens
         RUN cp /home/${DOCKER_UGNAME:-root}/.krew/bin/kubectl-ctx /usr/bin/kubectx
         RUN cp /home/${DOCKER_UGNAME:-root}/.krew/bin/* /usr/bin
         RUN chown -R ${DOCKER_UID:-1000}:${DOCKER_GID:-1000} /home/${DOCKER_UGNAME:-root}/
-        RUN curl -sL https://raw.githubusercontent.com/holman/spark/master/spark -o /usr/bin/spark && chmod +x /usr/bin/spark
-        RUN apk --no-cache add docker
+        RUN curl -sL https://raw.githubusercontent.com/holman/spark/master/spark -o /usr/bin/spark && chmod ugo+x /usr/bin/spark
+        RUN apk -q --no-cache add docker
         USER ${DOCKER_UGNAME:-root}
         ENV PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/home/${DOCKER_UGNAME:-root}/.krew/bin
     # NB: Left for reference, and possibly required by older versions of docker or certain configurations?  
@@ -213,7 +213,7 @@ services:
       context: .
       dockerfile_inline: |
         FROM ${DEBIAN_CONTAINER_VERSION:-debian:bookworm}
-        RUN apt-get update && apt-get install -y curl
+        RUN apt-get update -qq && apt-get install -qq -y curl
         RUN cd /tmp && curl -s -Lo helmify.tgz \
             https://github.com/arttor/helmify/releases/download/${HELMIFY_CLI_VERSION:-v0.4.12}/helmify_Linux_i386.tar.gz
         RUN cd /tmp && tar -zxvf helmify.tgz && chmod +x helmify && mv helmify /usr/local/bin/
@@ -336,7 +336,7 @@ services:
       context: .
       dockerfile_inline: |
         FROM debian
-        RUN apt-get update && apt-get install -y curl
+        RUN apt-get update -qq && apt-get install -qq -y curl
         RUN [ $(uname -m) = x86_64 ] \
           && curl -Lo /usr/bin/kind https://kind.sigs.k8s.io/dl/${KIND_CLI_VERSION:-v0.23.0}/kind-$(uname)-amd64 \
           && chmod o+x /usr/bin/kind
@@ -351,7 +351,7 @@ services:
       dockerfile_inline: |
         # Needs bugfix for missing 'infocmp' in latest release?
         FROM derailed/k9s:${K9S_VERSION:-v0.32.4}
-        RUN apk add ncurses
+        RUN apk add -q ncurses
         RUN which infocmp
     tty: true
     network_mode: host
@@ -415,6 +415,7 @@ services:
   ansible:
     <<: *base
     hostname: k8s:ansible
+    depends_on: ['dind']
     tty: true 
     build: 
       context: .
@@ -430,7 +431,7 @@ services:
         #     /usr/bin/kube* /usr/bin/helm* \
         #       /usr/bin/gum /usr/bin
         USER root
-        RUN apt-get update && apt-get install -y python3 python3-pip
+        RUN apt-get update -qq && apt-get install -qq -y python3 python3-pip
         RUN pip3 install --break-system-packages ansible==${ANSIBLE_VERSION:-10.1.0}
         RUN ansible-galaxy collection install kubernetes.core
         RUN pip install kubernetes --break-system-packages
@@ -460,7 +461,7 @@ services:
           /usr/bin/krew /usr/bin/gum \
           /usr/bin 
         USER root 
-        RUN apt-get update && apt-get install -y graphviz imagemagick
+        RUN apt-get update -qq && apt-get install -qq -y graphviz imagemagick
         USER ${DOCKER_UGNAME:-root}
 
 # https://github.com/kdash-rs/kdash?tab=readme-ov-file

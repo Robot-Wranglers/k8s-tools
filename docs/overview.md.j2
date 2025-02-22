@@ -1,5 +1,8 @@
 {% import 'macros.j2' as macros -%}
 
+## Overview
+<hr style="width:100%;border-bottom:3px solid black;">
+
 The **k8s-tools suite** aggregates 20+ individual utilities for working with kubernetes into a single dockerized toolchain, and provides a zero-dependency automation framework for extending and interacting it. Project-local clusters, cluster lifecycle automation, customizable TUIs, and more.
 
 {#
@@ -18,10 +21,9 @@ Besides bundling some tooling in k8s-tools.yml, there are 2 other components tha
 
 {{macros.img_link("e2e-k3d.commander.gif", mkdocs, "90%")}}
 
+
+### Introduction
 <hr style="width:100%;border-bottom:3px solid black;">
-
-## Intro
-
 **k8s-tools** operates at a project-automation layer and is designed to embrace and extend other tools, so it doesn't really conflict or compete with anything.  It's useful for CI/CD pipelines or general development, and is designed to be [embedded alongside existing projects]({{mkdocs.site_relative_url}}/integration).  
 
 This reference focuses on a few use-cases in particular:

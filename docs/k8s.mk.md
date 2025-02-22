@@ -1,21 +1,23 @@
 ## k8s.mk
+<hr style="width:100%;border-bottom:3px solid black;">
 
-`k8s.mk` exists to create automation APIs over the tool-containers that are described in k8s-tools.yml, and includes lots of helper targets for working with Kubernetes.  It works best in combination with [compose.mk](/compose.mk) and [k8s-tools.yml](/k8s-tools//features), but in many cases that isn't strictly required if things like `kubectl` are already available on your host.  
+`k8s.mk` exists to create automation APIs over the tool-containers that are described in k8s-tools.yml, and includes lots of helper targets for working with Kubernetes.  It works best in combination with [compose.mk](/compose.mk) and [k8s-tools.yml](/k8s-tools/features), but in many cases that isn't strictly required if things like `kubectl` are already available on your host.  
 
 The focus is on simplifying a few categories of frequent challenges:
 
-1. **Reusable implementations for common cluster automation tasks,** like [waiting for pods to get ready](/k8s-tools//api#k8s.wait)
-1. **Context-management tasks,** (like [setting the currently active namespace](/k8s-tools//api#k8snamespacearg))
-1. **Interactive debugging tasks,** (like [shelling into a new or existing pod inside some namespace](/k8s-tools//api#k8sshellarg))
+1. **Reusable implementations for common cluster automation tasks,** like [waiting for pods to get ready](/k8s-tools/api#k8s.wait)
+1. **Context-management tasks,** (like [setting the currently active namespace](/k8s-tools/api#k8snamespacearg))
+1. **Interactive debugging tasks,** (like [shelling into a new or existing pod inside some namespace](/k8s-tools/api#k8sshellarg))
 
-The full API is [here](/k8s-tools//api/#api-k8smk), and the [Cluster Lifecycle Demo](/k8s-tools//demos#demo-cluster-automation) includes a walk-through of using it from your own project automation.  
+The full API is [here](/k8s-tools/api/#api-k8smk), and the [Cluster Lifecycle Demo](/k8s-tools/demos#demo-cluster-automation) includes a walk-through of using it from your own project automation.  
 
-By combining these tools with compose.mk's [`flux.*` API](/k8s-tools//api#api-flux) you can describe workflows, and using the [`tux.*` API](/k8s-tools//api#api-tux) you can send tasks, or groups of tasks, into panes on a TUI.
+By combining these tools with compose.mk's [`flux.*` API](/k8s-tools/api#api-flux) you can describe workflows, and using the [`tux.*` API](/k8s-tools/api#api-tux) you can send tasks, or groups of tasks, into panes on a TUI.
 
 
 ### Automation APIs over Tool Containers
+<hr style="width:100%;border-bottom:3px solid black;">
 
-What *is* an automation API over a tool container anyway?  As an example, let's consider the [`k8s.get` target](/k8s-tools//api/#k8sget), which you might use like this:
+What *is* an automation API over a tool container anyway?  As an example, let's consider the [`k8s.get` target](/k8s-tools/api/#k8sget), which you might use like this:
 
 ```bash
 # Usage: k8s.get/<namespace>/<kind>/<name>/<filter>
@@ -25,7 +27,7 @@ $ KUBECONFIG=.. ./k8s.mk k8s.get/argo-events/svc/webhook-eventsource-svc/.spec.c
 $ kubectl get $${kind} $${name} -n $${namespace} -o json | jq -r $${filter}"
 ```
 
-The first command has no host requirements for `kubectl` or `jq`, but uses both via docker.  Similarly, the [`helm.install` target](/k8s-tools//api#helm.install) works as you'd expect but does not require `helm` (and plus it's a little more idempotent than using `helm` directly).  Meanwhile `k8s.mk k9s/<namespace>` works like `k9s --namespace` does, but doesn't require k9s.
+The first command has no host requirements for `kubectl` or `jq`, but uses both via docker.  Similarly, the [`helm.install` target](/k8s-tools/api#helm.install) works as you'd expect but does not require `helm` (and plus it's a little more idempotent than using `helm` directly).  Meanwhile `k8s.mk k9s/<namespace>` works like `k9s --namespace` does, but doesn't require k9s.
 
 Many of these targets are fairly simple wrappers, but just declaring them accomplishes several things at once.
 
@@ -39,7 +41,7 @@ The typical `k8s.mk` entrypoint is:
 
 Some targets like [`k8s.shell`](/api/#k8sshell) or [`kubefwd.[start|stop|restart]`](/api/#kubefwd) are more composite than simple wrappers, and achieve more complex behaviour by orchestrating 1 or more commands across 1 or more containers.  See also the [ansible wrapper](/api#api-ansible), which exposes a subset of `ansible` without all the overhead of inventories & config.
 
-If you want you can always to stream arbitrary commands or scripts into these containers more directly, via [the Make/Compose bridge](/k8s-tools//compose.mk#makecompose-bridge), or write your own targets that run inside those containers.  But the point of `k8s.mk` is to ignore more of the low-level details more of the time, and start to compose things.  For example, here's a one-liner that creates a namespace, adds a label to it, launches a pod there, and shells into it:
+If you want you can always to stream arbitrary commands or scripts into these containers more directly, via [the Make/Compose bridge](/k8s-tools/compose.mk#makecompose-bridge), or write your own targets that run inside those containers.  But the point of `k8s.mk` is to ignore more of the low-level details more of the time, and start to compose things.  For example, here's a one-liner that creates a namespace, adds a label to it, launches a pod there, and shells into it:
 
 ```bash 
 $ pod=`uuidgen` \
@@ -54,16 +56,13 @@ $ pod=`uuidgen` \
 
 
 ### But Why?
+<hr style="width:100%;border-bottom:3px solid black;">
 
 There's many reasons why you might want these capabilities if you're working with cluster-lifecycle automation.  People tend to have strong opions about this topic, and it's kind of a long story.  The short version is this: 
 
 * Tool versioning, idempotent operations, & deterministic cluster bootstrapping are all hard problems, but not really the problems we *want* to be working on.
 * IDE-plugins and desktop-distros that offer to manage Kubernetes are hard for developers to standardize on, and tend to resist automation.  
 * Project-local clusters are much-neglected, but also increasingly important aspects of project testing and overall developer-experience.  
-* Ansible/Terraform are great, but they have a lot of baggage, aren't necessarily a great fit for this type of problem, and they also have to be versioned.  
-
-`k8s.mk`, especially combined with `k8s-tools.yml` and `compose.mk`, is aimed at fixing this stuff.  
-
-If you're interested in the gory details of a longer-format answer, see [the Design Philosophy docs](/k8s-tools//but-why.md).
+* Ansible/Terraform are great, but they have to be versioned themselves, and aren't necessarily a great fit for this type of problem.  
 
 

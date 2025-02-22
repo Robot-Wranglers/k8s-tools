@@ -1,3 +1,4 @@
+#!/usr/bin/env -S make -f
 # demos/smoke-test.mk: 
 #
 #   A full end-to-end demo of cluster lifecycle management,
