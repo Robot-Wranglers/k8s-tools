@@ -24,50 +24,54 @@
 #   [1] https://robot-wranglers.github.io/k8s-tools
 #░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 
+include compose.mk 
 include k8s.mk
 
-# Cluster details that will be used by k3d.
-export CLUSTER_NAME:=k8s-tools-argowf
+.DEFAULT_GOAL := __main__
+export K3D_VERSION:=v5.6.3
 
 # Ensure local KUBECONFIG exists & ignore anything from environment
 export KUBECONFIG:=./fake.profile.yaml
 export _:=$(shell umask 066;touch ${KUBECONFIG})
 
-# Default entrypoint should do everything, end to end.
+# Cluster details that will be used by k3d.
+export CLUSTER_NAME:=k8s-tools-argowf
+
+# Default target should do everything, end to end.
 __main__: clean create deploy test
+
+# https://argoproj.github.io/argo-events/quick_start/
+argo_namespace=argo
+argo_workflows_version="v3.6.4"
+argo_app_url=https://raw.githubusercontent.com/argoproj/argo-workflows/main/examples/hello-world.yaml
+argo_infra_url=https://github.com/argoproj/argo-workflows/releases/download/${argo_workflows_version}/quick-start-minimal.yaml
 
 # Generate target-scaffolding for k8s-tools.yml services
 $(eval $(call compose.import, k8s-tools.yml))
 
-# Cluster lifecycle basics.  These are the same for all demos, and mostly just
-# setting up aliases for existing targets.  The `*.pre` targets setup hooks 
-clean.pre: flux.stage/cluster.clean
-clean cluster.clean teardown: k3d.cluster.delete/$${CLUSTER_NAME}
-create.pre: flux.stage/cluster.create
-create cluster.create: k3d.cluster.get_or_create/$${CLUSTER_NAME}
-wait cluster.wait: k8s.cluster.wait
-
-# Finished with boilerplate.  Start the argo-specific deploy/test process
+# BEGIN: Top-level
 #░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 
-argo_namespace=argo
-argo_workflows_version="v3.6.4"
-argo_repo=https://github.com/argoproj/argo-workflows
-argo_repo_raw=https://raw.githubusercontent.com/argoproj/argo-workflows
-argo_app_url=${argo_repo_raw}/main/examples/hello-world.yaml
-argo_infra_url=${argo_repo}/releases/download/${argo_workflows_version}/quick-start-minimal.yaml
+clean cluster.clean: flux.stage/cluster.clean k3d.dispatch/k3d.cluster.delete/$${CLUSTER_NAME}
+create cluster.create: \
+	flux.stage/cluster.create \
+	k3d.dispatch/flux.do.unless/self.cluster.create,self.cluster.exists
+teardown: flux.stage/cluster.teardown cluster.teardown
+self.cluster.create: k3d.cluster.get_or_create/$${CLUSTER_NAME}
 
-deploy.pre: flux.stage/cluster.deploy
+wait cluster.wait: k8s.cluster.wait
+deploy: flux.stage/deploy 
 deploy cluster.deploy: \
+	flux.stage/cluster.deploy \
 	flux.loop.until/k8s.cluster.ready \
 	infra.setup
 	
-test.pre: flux.stage/test
-test: infra.test app.test
+test: flux.stage/test infra.test app.test
+teardown cluster.teardown: flux.stage/cluster.teardown 
 
-infra.setup: argo.dispatch/.infra.setup 
-.infra.setup: k8s.wait k8s.kubens.create/${argo_namespace}
-	url="${argo_infra_url}" ${make} kubectl.apply.url
+infra.setup: flux.stage/infra.setup argo.dispatch/.infra.setup cluster.wait
+.infra.setup: k8s.kubens.create/${argo_namespace}
+	url="${argo_infra_url}" ${make} k8s.kubectl.apply.url
 
 infra.test: argo.dispatch/.infra.test
 	label="Previewing topology for argo namespace" \
@@ -80,7 +84,7 @@ app.test: argo.dispatch/.app.test
 	${mk.def.read}/argo.wf.template | ${argo.submit.stdin}
 	$(call io.mktemp) && ${mk.def.to.file}/argo.wf.template/$${tmpf} \
 	&& ${make} argo.submit/$${tmpf} 
-	url="${argo_app_url}" ${make} argo.submit.url
+	&& url="${argo_app_url}" ${make} argo.submit.url
 
 # BEGIN: Embedded data
 #░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░

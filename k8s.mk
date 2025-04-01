@@ -230,6 +230,12 @@ ansible.run/%: .ansible.require
 ## DOCS: 
 ##   [1] https://robot-wranglers.github.io/k8s-tools/api#api-helm
 #░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+k8s.kubectl.apply.url:; ${io.get.url} && ${make} k8s.kubectl.apply/$${tmpf}
+
+k8s.kubectl.apply/%:
+	@# Runs kubectl apply on the given file
+	@# Also available as a macro.
+	kubectl apply -f ${*} 2> >(grep -v "missing the kubectl.kubernetes.io/last-applied-configuration annotation")
 
 # helm.chart.install:
 # 	@#
@@ -653,8 +659,6 @@ k8s.graph.tui/%:
 		&& convert /tmp/svg.svg -transparent white -background transparent -flatten png:- 2>/dev/null
 .k8s.graph.tui.clear/%:; clear="--clear" ${make} .k8s.graph.tui/${*}
 
-#░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
-
 argo.list: argo.list/argo 
 	@# List for the default namespace (i.e. "argo")
 
@@ -662,13 +666,8 @@ argo.list/%:; argo -n ${*} list
 	@# Returns the results of 'argo list' for the current argo context.
 
 argo.submit.url:
-	@# Submits a workflow from a URL user the argo CLI.
-	@# The environment variable `url` must be set.
-	@#
-	@# USAGE:
-	@#   url=<url> ./k8s.mk argo.submit.url
-	$(call log.k8s, ${@} ${sep} ${dim}$${url})
-	${io.get.url} && cat $${tmpf} | ${make} argo.submit.stdin
+	$(call log.k8s, ${@} ${sep} ${cyan_flow_left})
+	${io.curl} $${url} | ${make} argo.submit.stdin
 
 argo.submit.stdin=${make} argo.submit.stdin 
 argo.submit.stdin stream.argo.submit :

@@ -56,8 +56,6 @@ nav:
   - Demos:
     - 'End-to-End Cluster Lifecycle': demos/cluster-lifecycle.md
     - 'Argo Workflows Example': demos/argo-wf.md
-    - 'Argo Events Example': demos/argo-events.md
-    - 'FaaS with Fission': demos/fission.md
   - Other:
     - 'Configuration / Env Vars': config.md
     - limitations.md

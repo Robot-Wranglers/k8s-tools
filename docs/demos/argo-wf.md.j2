@@ -3,12 +3,20 @@
 ## Argo Workflows Demo
 <hr style="width:100%;border-bottom:3px solid black;">
 
-This demo shows an example of a project-local kubernetes cluster that bootstraps [Argo Workflows](https://argoproj.github.io/workflows/), then exercises workflows by dispatching them, reading logs, etc.  There are no host dependencies at all except for `make` and `docker`, and the entire thing runs locally or [inside of github actions]({{github.actions_url}}/argo-wf.yml).
+The argo workflows demo shows an example of a project-local kubernetes cluster that's bootstrapped with argo, plus workflow dispatch.  It's managed via [`k8s.mk`]({{mkdocs.site_relative_url}}), which is orchestrating usage of several different tools like `k3d`, `kubectl`, `helm`, and `argo`.
+
+There are no host dependencies at all except for `make` and `docker`, and the entire thing runs locally or [inside of github actions]({{github.actions_url}}/argo-wf.yml).
 
 Since `k8s.mk` is built on top of [compose.mk]({{jinja.vars.composemk_docs_url}}), you'll want some of that background to completely understand the [demo code](#source-code), but for the most part it should be pretty easy to read and adapt.
 
+---------------
+
+The rest of this page is structured as follows.  [Basic Usage](#basic-usage) is up first, then [a (big) screenshot of end to end execution](#end-to-end-output).  After that we walk through some [other more interactive workflows](#interactive-workflows), and cap it off with the [inlined demo source code](#source-code).  The source is also available from the repository, see {{macros.repo_link('demos/cluster-lifecycle.mk', github)}}.
+
 ### Basic Usage
 <hr style="width:100%;border-bottom:3px solid black;">
+
+Running the demo is simple: 
 
 ```bash 
 
@@ -18,6 +26,9 @@ $ ./demos/argo-wf.mk
 # End-to-end, again without teardown 
 $ ./demos/argo-wf.mk clean create deploy test
 
+# Interactive shell for a cluster pod
+$ ./demos/argo-wf.mk cluster.shell 
+
 # Finally, teardown the cluster
 $ ./demos/argo-wf.mk teardown
 ```
@@ -25,7 +36,7 @@ $ ./demos/argo-wf.mk teardown
 ### End-to-End Output
 <hr style="width:100%;border-bottom:3px solid black;">
 
-Placeholder
+Placeholder 
 
 {{macros.img_link("argo-wf.png", mkdocs, "33%")}}
 

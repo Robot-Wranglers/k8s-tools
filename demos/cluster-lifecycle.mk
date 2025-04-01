@@ -42,8 +42,15 @@ export POD_NAMESPACE?=default
 # Generate target-scaffolding for k8s-tools.yml services
 $(eval $(call compose.import, k8s-tools.yml, ▰))
 
-# Default entrypoint should do everything, end to end.
-__main__: clean create deploy test
+__main__: flux.and/clean,create,deploy,test
+
+#░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+
+clean cluster.clean: flux.stage/cluster.clean k3d.dispatch/k3d.cluster.delete/$${CLUSTER_NAME}
+create cluster.create: \
+	flux.stage/cluster.create \
+	k3d.dispatch/self.cluster.maybe.create
+teardown: flux.stage/cluster.teardown cluster.teardown
 
 # Cluster lifecycle basics.  These are the same for all demos, and mostly just
 # setting up aliases for existing targets.  The `*.pre` targets setup hooks 
@@ -55,7 +62,6 @@ create.pre: flux.stage/cluster.create
 create cluster.create: k3d.cluster.get_or_create/$${CLUSTER_NAME}
 wait cluster.wait: k8s.cluster.wait
 
-# Finished with boilerplate.  Describe the local deploy/test process
 #░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 
 
@@ -83,6 +89,12 @@ self.test_harness.deploy: \
 	k8s.kubens.create/${POD_NAMESPACE} \
 	k8s.test_harness/${POD_NAMESPACE}/${POD_NAME} \
 	kubectl.apply/demos/data/nginx.svc.yml
+
+cluster.teardown:
+	${json.from} wait=yes kind=Pod state=absent name=${POD_NAME} namespace=${POD_NAMESPACE} \
+	| ${make} k8s.ansible
+	${json.from} wait=true name=ahoy state=absent release_namespace=default \
+	| ${make} ansible.helm 
 
 #░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 
