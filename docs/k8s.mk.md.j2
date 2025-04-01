@@ -22,11 +22,11 @@ By combining these tools with compose.mk's [`flux.*` API]({{jinja.vars.composemk
 
 What *is* an automation API over a tool container anyway?  
 
-As an example, let's consider the [`k8s.get` target]({{mkdocs.site_relative_url}}/api/#k8sget), which you might use like this:
+As an example, let's consider the [`kubectl.get` target]({{mkdocs.site_relative_url}}/api/#k8sget), which you might use like this:
 
 ```bash
-# Usage: k8s.get/<namespace>/<kind>/<name>/<filter>
-$ KUBECONFIG=.. ./k8s.mk k8s.get/argo-events/svc/webhook-eventsource-svc/.spec.clusterIP
+# Usage: kubectl.get/<namespace>/<kind>/<name>/<filter>
+$ KUBECONFIG=.. ./k8s.mk kubectl.get/argo-events/svc/webhook-eventsource-svc/.spec.clusterIP
 
 # roughly equivalent to:
 $ kubectl get $${kind} $${name} -n $${namespace} -o json | jq -r ..filter.."
