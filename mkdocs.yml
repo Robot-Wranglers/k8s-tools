@@ -52,6 +52,7 @@ nav:
     - 'Full API': 'api.md'
   - Demos:
     - 'End-to-End Cluster Lifecycle': demos/cluster-lifecycle.md
+    - 'Argo Workflows Example': demos/argo-wf.md
   - Other:
     - 'Configuration / Env Vars': config.md
     - limitations.md

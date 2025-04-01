@@ -257,6 +257,8 @@ ansible.run/%: .ansible.require
 ## DOCS: 
 ##   [1] https://robot-wranglers.github.io/k8s-tools/api#api-helm
 #░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+k8s.kubectl.apply.url:; ${io.get.url} && ${make} k8s.kubectl.apply/$${tmpf}
+
 k8s.kubectl.apply/%:
 	@# Runs kubectl apply on the given file
 	@# Also available as a macro.
@@ -278,6 +280,7 @@ helm.chart.install:
 			&& ${trace_maybe} && helm install $${name} $${chart_ref} -o json | jq .info);; \
 	esac
 helm.repo.list: helm.dispatch/.helm.repo.list
+	@# Returns JSON for the currently available helm repositories.
 .helm.repo.list:; helm repo list -o json
 
 helm.repo.require/%:
@@ -301,9 +304,10 @@ helm.release.status/%:
 	$(call io.mktemp) \
 	&& helm status ${*} -o json 2>/dev/null | jq .info > $${tmpf} \
 	&& case `cat $${tmpf}` in \
-		"") $(call log.k8s,helm.release.status ${sep} ${bold}${*} ${sep} ${dim_ital}no such release!);; \
+		"") $(call log.k8s, helm.release.status ${sep} ${bold}${*} ${sep} ${dim_ital}no such release!);; \
 		*) cat $${tmpf}| jq . ;; \
 	esac
+
 helm.release.stat/%:
 	@# Like `helm.status`, but strict and quiet for use with conditionals.
 	@# Result status is an error if the given repo name doesnt exist 
@@ -314,6 +318,7 @@ helm.release.stat/%:
 	header="${GLYPH_K8S} helm.release.stat ${sep} ${bold}${*} ${sep}" \
 	&& $(call log.trace,$${header} ${dim_ital} asserting release exists..) \
 	&& ${make} helm.release.status/${*} 2>/dev/null| jq -e . >/dev/null
+
 helm.release.present/%: ; ${make} helm.release.stat/${*} >/dev/null
 helm.release.missing/%: ; ${make} flux.negate/helm.release.present/${*}
 
@@ -591,16 +596,19 @@ k8s.graph.tui/%:
 			-Gbgcolor=transparent -Gsize=200,200 \
 			-Estyle=bold -Ecolor=red -Eweight=150 2> /dev/null \
 		&& convert /tmp/svg.svg -transparent white -background transparent -flatten png:- 2>/dev/null
-# > $${outfile} \
-# && chafa \
-# 	--invert -c full --size $${size:-${io.term.width}} \
-# 	--center=on $${clear:-} $${outfile}
 .k8s.graph.tui.clear/%:; clear="--clear" ${make} .k8s.graph.tui/${*}
+
+argo.list: argo.list/argo 
+	@# List for the default namespace (i.e. "argo")
+
+argo.list/%:; argo -n ${*} list 
+	@# Returns the results of 'argo list' for the current argo context.
 
 argo.submit.url:
 	$(call log.k8s, ${@} ${sep} ${cyan_flow_left})
 	${io.curl} $${url} | ${make} argo.submit.stdin
 
+argo.submit.stdin=${make} argo.submit.stdin 
 argo.submit.stdin stream.argo.submit :
 	@#
 	@#

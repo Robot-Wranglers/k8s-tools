@@ -1,0 +1,25 @@
+# See also: https://docs.github.com/en/actions
+name: ArgoWF Demo
+on:
+  workflow_dispatch: {}
+  workflow_call: {}
+  push:
+    branches: [ "main" ]
+    paths-ignore:  ['**.gif', '**.md', '**.md.j2', '**.mmd', '**.png', '**.svg']
+  pull_request:
+    branches: [ "main" ]
+    paths-ignore:  ['**.gif', '**.md', '**.md.j2', '**.mmd', '**.png', '**.svg']
+permissions:
+  contents: read
+jobs:
+  test:
+    name: ArgoWF Demo
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Initialize
+        run: make clean init build
+      - name: Run ArgoWF Demo
+        run: ./demos/argo-wf.mk
+        env:
+          COLUMNS: 150

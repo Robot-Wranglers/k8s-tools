@@ -26,3 +26,4 @@ docs/raw-docker.md
 docs/tool-overview.md
 fake.profile.yaml
 *.profile.yaml
+docs/*md

@@ -50,7 +50,7 @@ $(eval $(call compose.import, k8s-tools.yml, ▰))
 
 __main__: flux.and/clean,create,deploy,test
 
-###############################################################################
+#░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 
 clean cluster.clean: flux.stage/cluster.clean k3d.dispatch/k3d.cluster.delete/$${CLUSTER_NAME}
 create cluster.create: \
@@ -63,7 +63,7 @@ self.cluster.maybe.create: flux.do.unless/self.cluster.create,self.cluster.exist
 self.cluster.exists: k3d.has_cluster/$${CLUSTER_NAME}
 self.cluster.create: k3d.cluster.get_or_create/$${CLUSTER_NAME}
 
-###############################################################################
+#░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 
 deploy cluster.deploy: \
 	flux.stage/cluster.deploy \
@@ -111,7 +111,7 @@ cluster.teardown:
 	${json.from} wait=true name=ahoy state=absent release_namespace=default \
 	| ${make} ansible.helm 
 
-###############################################################################
+#░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 
 test: test.cluster test.contexts 
 test.cluster cluster.test: flux.stage/cluster.test cluster.wait
@@ -137,6 +137,6 @@ get.pod.ctx:
 	@# Runs inside the kubernetes cluster
 	echo uname -n | ${make} k8s.shell/${POD_NAMESPACE}/${POD_NAME}/pipe
 
-###############################################################################
+#░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 
 cluster.shell: k8s.shell/${POD_NAMESPACE}/${POD_NAME}
