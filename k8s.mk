@@ -102,20 +102,20 @@ ansible.adhoc/%:
 	&& $(call log.k8s, $${header} ${sep} ${cyan_flow_left}) \
 	&& $(io.mktemp) \
 	&& ${stream.stdin}  \
-	| ${jq.run} . | ${stream.peek} \
+	| ${jq} . | ${stream.peek} \
 	| ${make} .ansible.gen.playbook/${*} \
-	| ${jq.run} -c . \
+	| ${jq} -c . \
 	| quiet=1 ${make} ansible.run > $${tmpf} \
-	; tmp=`cat $${tmpf} | ${jq.run} '.plays[0].tasks[].hosts.localhost.failed'` \
+	; tmp=`cat $${tmpf} | ${jq} '.plays[0].tasks[].hosts.localhost.failed'` \
 	&& case $${tmp} in \
 		true) (\
 			$(call log, $${header} ${sep} ${red}Task failed:); \
-			cat $${tmpf} | ${jq.run} '.plays[0].tasks[].hosts.localhost' | ${stream.as.log}; \
+			cat $${tmpf} | ${jq} '.plays[0].tasks[].hosts.localhost' | ${stream.as.log}; \
 			$(call log, $${header} ${sep} ${red}Task failed); exit 43); ;; \
 		false) ( \
 			$(call log.k8s, $${header} ${sep} false ${cyan_flow_right}) \
 			&& $(call log.trace, $${header} ${sep} false ${sep} ${cyan_flow_right}) \
-			&& cat $${tmpf} | ${jq.run} ${ansible.adhoc.filter} ); ;; \
+			&& cat $${tmpf} | ${jq} ${ansible.adhoc.filter} ); ;; \
 		null) ( \
 			$(call log.k8s, $${header} ${sep} ${cyan_flow_right}) \
 			&& $(call log.trace, $${header} ${sep} null ${sep} ${cyan_flow_right}) \
@@ -340,18 +340,15 @@ k3d.cluster.delete/%:
 	$(call log.k8s, ${@} ${sep} Deleting cluster ${sep}${underline}${*})
 	(set -x && k3d cluster delete ${*}) || true
 
-k3d.cluster.list k3d.list: 
+k3d.cluster.list k3d.list:; $(call containerized.maybe, k3d)
 	@# Returns cluster-names, newline delimited.
 	@#
 	@# USAGE:  
 	@#   ./k8s.mk k3d.cluster.list
 	@# 
-	$(call log.k8s, ${@} ${sep}${dim} Listing clusters)
-	cmd="k3d cluster list -o json | ${jq.run} -r '.[].name'" \
-	&& (case "$${CMK_INTERNAL:-0}" in \
-		0) ${log.trace.target.rerouting} && printf "$${cmd}" | CMK_DEBUG=0 ${make} k8s-tools/k3d/shell/pipe; ;; \
-		*) eval $${cmd}; ;;  \
-	esac) | xargs -n1 echo  | ${stream.indent}
+.k3d.cluster.list .k3d.list:
+	k3d cluster list -o json | ${jq} -r '.[].name' \
+	| xargs -n1 echo  | ${stream.indent}
 
 k3d.commander:
 	@# Starts a 4-pane TUI dashboard, using the commander layout.  
@@ -406,7 +403,7 @@ k3d.panic:
 # 	@# 
 # 	$(call log, ${dim}${GLYPH_K8S} ${@} ${sep}${dim} Listing k3d containers)
 # 	(docker ps --format json \
-# 	| ${jq.run} -r '.Names' \
+# 	| ${jq} -r '.Names' \
 # 	| grep ^k3d- \
 # 	|| printf "${yellow}No containers found.${no_ansi}\n" > ${stderr} ) ${stderr_stdout_indent}
 
@@ -738,7 +735,7 @@ k8s.namespace.label/%:
 	&& val=$${val:-`echo ${*}|cut -s -d/ -f3`} \
 	&& ( printf '{ "state": "patched", "kind": "Namespace", "name": "' \
 	; printf "$${ns}"; printf '", "definition": {"metadata": {"labels": {' \
-	; printf "\"$${key}\": \"$${val}\"}}}}") | ${jq.run} . \
+	; printf "\"$${key}\": \"$${val}\"}}}}") | ${jq} . \
 	| ${make} k8s.ansible
 
 k8s.namespace.wait/%:
@@ -817,7 +814,13 @@ k8s.cluster.ready k8s.ready:
 	&& tmp=`[ "${*}" == "all" ] && echo Cluster || echo Namespace` \
 	&& $(call log.k8s, $${header} ${sep}${dim} $${stamp} ${sep} $${tmp} ready ${GLYPH_SPARKLE})
 
-k8s.stat:
+
+define containerized.maybe
+case $${CMK_INTERNAL} in 0)  ${log.target.rerouting} ; quiet=1 ${make} $(strip ${1}).dispatch/.$(strip ${@});; *) ${make} .$(strip ${@}) ;; esac
+endef
+
+k8s.stat:; $(call containerized.maybe, k8s)
+.k8s.stat:
 	@# Describes status for cluster, cluster auth, and namespaces.
 	@# Not pipe friendly, and not suitable for parsing!  
 	@#
@@ -826,17 +829,12 @@ k8s.stat:
 	@#
 	@# For a shorter, looping version that's suitable as a tmux widget, see 'k8s.stat.widget'
 	@#
-	case $${CMK_INTERNAL} in \
-		0)  ${log.target.rerouting} \
-			; quiet=1 ${make} k8s.dispatch/${@} \
-			; exit $$? ; ;; \
-		*) true \
-			&& tmp1=`kubectx -c||true` && tmp2=`kubens -c ||true` \
-			&& $(call log.k8s, k8s.stat ${no_ansi_dim}ctx=${green}${underline}$${tmp1}${no_ansi_dim} ns=${green}${underline}$${tmp2}) \
-			&& ${make} k8s.stat.env kubectl.stat.cluster \
-				kubectl.get.nodes kubectl.stat.auth  \
-				k8s.stat.ns k8s.stat.ctx; ;; \
-	esac
+	tmp1=`kubectx -c||true` && tmp2=`kubens -c ||true` \
+		&& $(call log.k8s, k8s.stat ${no_ansi_dim}ctx=${green}${underline}$${tmp1}${no_ansi_dim} ns=${green}${underline}$${tmp2}) \
+		&& ${make} k8s.stat.env kubectl.stat.cluster \
+			kubectl.get.nodes kubectl.stat.auth  \
+			k8s.stat.ns k8s.stat.ctx;
+
 k8s.test_harness.random:; ${make} k8s.test_harness/default/`uuidgen`
 	@# Starts a test-pod with a random name in the given namespace, optionally blocking until it's ready.
 	@#
@@ -991,7 +989,7 @@ kubefwd.start/% k8s.namespace.fwd/%:
 		"") filter=$${filter:-}; ;; \
 		*) \
 			filter="-f metadata.name=$${svc_name}"; \
-			header="$${header} ${sep} ${bold_green}$${svc_name}"; ;; \
+			header="$${header} ${sep} ${green_bold}$${svc_name}"; ;; \
 	esac \
 	&& case "$${mapping}" in \
 		"") true; ;; \
@@ -1024,7 +1022,7 @@ ktop: ktop/all
 	@# Launches ktop tool.  
 	@# (This assumes 'ktop' is mentioned in 'KREW_PLUGINS')
 
-ktop/%:
+ktop/%:; $(call containerized.maybe, k8s)
 	@# Launches ktop tool for the given namespace.
 	@# This works from inside a container or from the host.
 	@#
@@ -1032,11 +1030,9 @@ ktop/%:
 	@#
 	@# USAGE:
 	@#   ./k8s.mk ktop/<namespace>
-	@#
+.ktop/%:
 	scope=`[ "${*}" == "all" ] && echo "--all-namespaces" || echo "-n ${*}"` \
-	&& [ "$${CMK_INTERNAL:-0}" = "0" ] \
-		&& cmd="ktop $${scope}" entrypoint=kubectl ${make} k8s \
-		|| kubectl ktop $${scope}
+	&& kubectl ktop $${scope}
 
 
 k9s/%:; cmd="-n ${*}" ${make} k9s 
