@@ -3177,8 +3177,8 @@ flux.try.except.finally/%:
 ##░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 
 # WARNING: without the tr, osx `wc -w` injects tabbed junk at the beginning of the result!
-stream.count.words=wc -w|tr -d '[:space:]'
-stream.count.lines=wc -l|tr -d '[:space:]'
+stream.count.words=wc -w | tr -d '[:space:]'
+stream.count.lines=wc -l | tr -d '[:space:]'
 
 stream.stderr.iff.failed=2> >(stderr=$$(cat); exit_code=$$?; if [ $$exit_code -ne 0 ]; then echo "$$stderr" >&2; fi; exit $$exit_code)
 stream.as.log=( ${stream.dim.indent} > ${stderr}; printf "\n" >/dev/stderr)
@@ -3199,7 +3199,7 @@ stream.fold:; ${stream.fold}
 	@# Also available as a macro.
 stream.fold=${stream.nl.to.space} | fold -s -w $${width:-${io.term.width}}
 
-stream.code:; ${stream.stdin}| ${make} io.preview.file//dev/stdin
+stream.code:; ${stream.stdin} | ${make} io.preview.file//dev/stdin
 	@# A version of `io.preview.file` that works with streaming input.
 	@# Uses pygments on the backend; pass style=.. lexer=.. to override.
 

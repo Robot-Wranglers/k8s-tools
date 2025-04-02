@@ -55,11 +55,10 @@ __main__: flux.and/clean,create,deploy,test
 clean cluster.clean: flux.stage/cluster.clean k3d.dispatch/k3d.cluster.delete/$${CLUSTER_NAME}
 create cluster.create: \
 	flux.stage/cluster.create \
-	k3d.dispatch/self.cluster.maybe.create
+	k3d.dispatch/flux.do.unless/self.cluster.create,self.cluster.exists
 teardown: flux.stage/cluster.teardown cluster.teardown
 
 wait cluster.wait: k8s.cluster.wait
-self.cluster.maybe.create: flux.do.unless/self.cluster.create,self.cluster.exists
 self.cluster.exists: k3d.has_cluster/$${CLUSTER_NAME}
 self.cluster.create: k3d.cluster.get_or_create/$${CLUSTER_NAME}
 
@@ -103,7 +102,7 @@ deploy.test_harness: flux.retry/3/k8s.dispatch/self.test_harness.deploy
 self.test_harness.deploy: \
 	k8s.kubens.create/${POD_NAMESPACE} \
 	k8s.test_harness/${POD_NAMESPACE}/${POD_NAME} \
-	k8s.kubectl.apply/demos/data/nginx.svc.yml
+	kubectl.apply/demos/data/nginx.svc.yml
 
 cluster.teardown:
 	${json.from} wait=yes kind=Pod state=absent name=${POD_NAME} namespace=${POD_NAMESPACE} \
@@ -131,12 +130,12 @@ test.contexts:
 
 get.compose.ctx:
 	@# Runs on the container defined by compose service
-	echo uname -n | ${make} k8s-tools/k8s/shell/pipe
+	echo uname -n | ${make} k8s.shell.pipe
 
 get.pod.ctx:
 	@# Runs inside the kubernetes cluster
-	echo uname -n | ${make} k8s.shell/${POD_NAMESPACE}/${POD_NAME}/pipe
+	echo uname -n | ${make} kubectl.exec.pipe/${POD_NAMESPACE}/${POD_NAME}
 
 #░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 
-cluster.shell: k8s.shell/${POD_NAMESPACE}/${POD_NAME}
+cluster.shell: k8s.dispatch/k8s.shell/${POD_NAMESPACE}/${POD_NAME}

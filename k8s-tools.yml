@@ -94,6 +94,10 @@ services:
       # - ${HOME}/.aws:/home/${DOCKER_UGNAME:-root}/.aws
     tty: true 
   
+  kubectl_exec:
+    <<: *base
+    entrypoint: kubectl
+  
   # https://helm.sh/docs/
   helm:
     <<: *base
