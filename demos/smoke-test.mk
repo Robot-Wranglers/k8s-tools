@@ -13,7 +13,7 @@
 include k8s.mk
 
 .DEFAULT_GOAL := all 
-export KUBECONFIG:=./fake.profile.yaml
+export KUBECONFIG:=./local.cluster.yml
 export _:=$(shell umask 066;touch ${KUBECONFIG})
 $(eval $(call compose.import, ▰, FALSE, k8s-tools.yml))
 

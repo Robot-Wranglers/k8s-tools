@@ -30,7 +30,7 @@
     "template_includes": ['docs'],
     "vars": {
       "composemk_repo_url": "https://github.com/Robot-Wranglers/compose.mk",
-      "composemk_docs_url": "https://robot-wranglers.github.io/compose.mk/",
+      "composemk_docs_url": "https://robot-wranglers.github.io/compose.mk",
     }
   },
 }

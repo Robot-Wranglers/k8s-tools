@@ -1,5 +1,5 @@
 #!/usr/bin/env -S make -f
-#░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+####################################################################################
 # demos/argo-events.mk: 
 #   Automation for a self-contained cluster with anargo-events deployment.
 #   This exercises `compose.mk`, `k8s.mk`, plus the `k8s-tools.yml` services to 
@@ -11,7 +11,7 @@
 #
 # USAGE: 
 #
-#   # Default: clean/create/deploy/test for cluster without any teardown
+#   # Default runs clean, create, deploy, test, but does not tear down the cluster
 #   ./demos/argo-events.mk
 #
 #   # End-to-end, again without teardown 
@@ -24,10 +24,11 @@
 #   [1] https://robot-wranglers.github.io/k8s-tools
 #░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 
+include compose.mk 
 include k8s.mk
 
 # Ensure local KUBECONFIG exists & ignore anything from environment
-export KUBECONFIG:=./fake.profile.yaml
+export KUBECONFIG:=./local.cluster.yml
 export _:=$(shell umask 066;touch ${KUBECONFIG})
 
 # Cluster details that will be used by k3d.
@@ -49,10 +50,10 @@ create.pre: flux.stage/cluster.create
 create cluster.create: k3d.cluster.get_or_create/$${CLUSTER_NAME}
 wait cluster.wait: k8s.cluster.wait
 
-# Finished with boilerplate.  Start the argo-specific deploy/test process
-# See also the docs at https://argoproj.github.io/argo-events/quick_start/
+# Deployment & tests for ArgoWF and Argo Events.
 #░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 
+# https://argoproj.github.io/argo-events/quick_start/
 define argo.events.manifests
  https://raw.githubusercontent.com/argoproj/argo-events/stable/manifests/install.yaml
  https://raw.githubusercontent.com/argoproj/argo-events/stable/manifests/install-validating-webhook.yaml
@@ -64,17 +65,17 @@ define argo.events.manifests
 endef
 argo.manifest=https://github.com/argoproj/argo-workflows/releases/download/v${ARGO_WORKFLOWS_VERSION}/install.yaml
 
-deploy: argo.setup argo.events.setup k8s.wait.quiet
+deploy: argo.setup argo.events.setup k8s.wait
 	@# Note that this is not idempotent and fails on a second usage!
 	mapping="12000:12000" ${make} kubefwd.start/argo-events/webhook-eventsource-svc
 
-argo.setup:; $(call in.container, k8s)
+argo.setup:; $(call containerized.maybe, k8s)
 .argo.setup: k8s.kubens.create/argo
-	${kubectl.apply} ${argo.manifest} | ${stream.as.log}
-kubectl.apply=kubectl apply -f
-argo.events.setup:; $(call in.container, k8s)
+	kubectl apply -f ${argo.manifest}
+
+argo.events.setup:; $(call containerized.maybe, k8s)
 .argo.events.setup: k8s.kubens.create/argo-events
-	${mk.def.read}/argo.events.manifests | ${io.xargs} "${kubectl.apply} %" | ${stream.as.log}
+	${mk.def.read}/argo.events.manifests | ${io.xargs} "kubectl apply -f %"
 
 test:
 	curl -d '{"message":"this is my first webhook"}' \

@@ -13,13 +13,11 @@ THIS_MAKEFILE:=$(abspath $(firstword $(MAKEFILE_LIST)))
 
 export SRC_ROOT := $(shell git rev-parse --show-toplevel 2>/dev/null || pwd)
 export PROJECT_ROOT := $(shell dirname ${THIS_MAKEFILE})
-export KUBECONFIG?=./fake.profile.yaml
+export KUBECONFIG?=./local.cluster.yml
 export _:=$(shell umask 066;touch ${KUBECONFIG})
 
 export KN_CLI_VERSION?=v1.14.0
 export HELMIFY_CLI_VERSION?=v0.4.12
-export K3D_VERSION?=v5.6.3
-
 
 include compose.mk
 $(eval $(call compose.import,k8s-tools.yml))
@@ -151,3 +149,5 @@ actions.run.delete/%:; gh run delete ${*}
 
 actions.list/%:; gh run list --status ${*} --json databaseId
 	@# Helper for filtering action runs
+
+shell: tux.open.services/k8s.shell,subctl.shell

@@ -52,7 +52,34 @@ These targets use [the ansible container]({{macros.search_link('k8s-tools.yml','
 
 {{macros.parse_help('k8s.mk', 'ansible')}}
 
-#### API k3d
+#### API: argo
+<hr style="width:100%;border-bottom:3px solid black;">
+
+{{macros.parse_module_help('k8s.mk', 'argo')}}
+
+These targets use [the argo container]({{macros.search_link('k8s-tools.yml','k8s:argo',github)}}), but are generally safe to run from the docker-host.  
+
+{{macros.parse_help('k8s.mk', 'argo')}}
+
+#### API: fission
+<hr style="width:100%;border-bottom:3px solid black;">
+
+{{macros.parse_module_help('k8s.mk', 'fission')}}
+
+These targets use [the fission container]({{macros.search_link('k8s-tools.yml','k8s:fission',github)}}), but are generally safe to run from the docker-host.  
+
+{{macros.parse_help('k8s.mk', 'fission')}}
+
+#### API: kind
+<hr style="width:100%;border-bottom:3px solid black;">
+
+{{macros.parse_module_help('k8s.mk','k3d')}}
+
+For more details, read on into the API, or see the [k8s:kind container spec in k8s-tools.yml]({{macros.search_link('k8s-tools.yml', 'kind', github)}})
+  
+{{macros.parse_help('k8s.mk', 'k3d')}}
+
+#### API: k3d
 <hr style="width:100%;border-bottom:3px solid black;">
 
 {{macros.parse_module_help('k8s.mk','k3d')}}
