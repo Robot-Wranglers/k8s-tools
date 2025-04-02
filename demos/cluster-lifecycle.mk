@@ -49,7 +49,7 @@ __main__: flux.and/clean,create,deploy,test
 clean cluster.clean: flux.stage/cluster.clean k3d.dispatch/k3d.cluster.delete/$${CLUSTER_NAME}
 create cluster.create: \
 	flux.stage/cluster.create \
-	k3d.dispatch/self.cluster.maybe.create
+	k3d.dispatch/flux.do.unless/self.cluster.create,self.cluster.exists
 teardown: flux.stage/cluster.teardown cluster.teardown
 
 # Cluster lifecycle basics.  These are the same for all demos, and mostly just
@@ -61,6 +61,8 @@ clean cluster.clean teardown: k3d.cluster.delete/$${CLUSTER_NAME}
 create.pre: flux.stage/cluster.create
 create cluster.create: k3d.cluster.get_or_create/$${CLUSTER_NAME}
 wait cluster.wait: k8s.cluster.wait
+self.cluster.exists: k3d.has_cluster/$${CLUSTER_NAME}
+self.cluster.create: k3d.cluster.get_or_create/$${CLUSTER_NAME}
 
 #░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 
@@ -125,6 +127,4 @@ get.pod.ctx:
 
 #░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 
-cluster.shell: k8s.pod.shell/${POD_NAMESPACE}/${POD_NAME}
-	@# Opens an interactive shell into the test-pod.
-	@# This requires that `deploy.test_harness` has already run.
+cluster.shell: k8s.dispatch/k8s.shell/${POD_NAMESPACE}/${POD_NAME}

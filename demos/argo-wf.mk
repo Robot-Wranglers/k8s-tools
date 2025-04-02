@@ -52,26 +52,24 @@ $(eval $(call compose.import, k8s-tools.yml))
 # BEGIN: Top-level
 #░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 
-clean cluster.clean: flux.stage/cluster.clean k3d.dispatch/k3d.cluster.delete/$${CLUSTER_NAME}
+clean cluster.clean teardown: flux.stage/cluster.clean k3d.dispatch/k3d.cluster.delete/$${CLUSTER_NAME}
 create cluster.create: \
 	flux.stage/cluster.create \
 	k3d.dispatch/flux.do.unless/self.cluster.create,self.cluster.exists
-teardown: flux.stage/cluster.teardown cluster.teardown
+: flux.stage/cluster.teardown cluster.teardown
 self.cluster.create: k3d.cluster.get_or_create/$${CLUSTER_NAME}
 
 wait cluster.wait: k8s.cluster.wait
-deploy: flux.stage/deploy 
 deploy cluster.deploy: \
 	flux.stage/cluster.deploy \
 	flux.loop.until/k8s.cluster.ready \
 	infra.setup
 	
 test: flux.stage/test infra.test app.test
-teardown cluster.teardown: flux.stage/cluster.teardown 
 
 infra.setup: flux.stage/infra.setup argo.dispatch/.infra.setup cluster.wait
 .infra.setup: k8s.kubens.create/${argo_namespace}
-	url="${argo_infra_url}" ${make} k8s.kubectl.apply.url
+	url="${argo_infra_url}" ${make} kubectl.apply.url
 
 infra.test: argo.dispatch/.infra.test
 	label="Previewing topology for argo namespace" \
