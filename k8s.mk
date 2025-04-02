@@ -344,7 +344,7 @@ k3d.cluster.delete/%:; $(call in.container, k3d)
 	$(call log.k8s, ${@} ${sep} Deleting cluster ${sep}${underline}${*})
 	(set -x && k3d cluster delete ${*}) || true
 
-k3d.cluster.list k3d.list:; $(call in.container, k3d)
+k3d.cluster.list k3d.list:; $(call containerized.maybe, k3d)
 	@# Returns cluster-names, newline delimited.
 	@#
 	@# USAGE:  
@@ -821,7 +821,56 @@ k8s.ready k8s.cluster.ready:; $(call in.container, k8s)
 	@#
 	quiet=1 ${make} k8s.dispatch/kubectl.cluster.ready/$${KUBECONFIG}
 
-k8s.stat:; $(call in.container, k8s)
+.k8s.namespace.wait/%:
+	@#
+	@#
+	@#
+	export scope=`[ "${*}" == "all" ] && echo "--all-namespaces" || echo "-n ${*}"` \
+	&& export header="k8s.namespace.wait ${sep} ${green}${*}${no_ansi}" \
+	&& stamp=`date +'%H:%M:%S'` \
+	&& wait_cmd="gum \
+		spin --spinner $${spinner:-jump} \
+		--spinner.foreground=$${color:-39} \
+		--title=\"Waiting ${K8S_POLL_DELTA}s\" \
+		-- sleep ${K8S_POLL_DELTA}" \
+	&& $(call log.k8s, $${header} ${sep}${dim} Looking for pending pods) \
+	&& until \
+		kubectl get pods $${scope} -o json 2> /dev/null \
+		| jq '[.items[].status.containerStatuses[]|select(.state.waiting)]' 2> /dev/null \
+		| jq '.[] | halt_error(length)' 2> /dev/null \
+	; do \
+		kubectl sick-pods $${scope} 2>&1 \
+			| sed 's/^[ \t]*//'\
+			| sed "s/FailedMount/$(shell printf "${yellow}Failed${no_ansi}")/g" \
+			| sed "s/streaming log results:/streaming log results:\n\t/g" \
+			| sed "s/is not ready! Reason Provided: None/$(shell printf "${bold}not ready!${no_ansi}")/g" \
+			| sed 's/ in pod /\n\t\tin pod /g' \
+			| sed -E 's/assigned (.*) to (.*)$$/assigned \1/g' \
+			| sed "s/Failed\n\n/$(shell printf "${yellow}Failed${no_ansi}")/g" \
+			| sed "s/Scheduled/$(shell printf "${yellow}Scheduled${no_ansi}")/g" \
+			| sed "s/Pulling/$(shell printf "${green}Pulling${no_ansi}")/g" \
+			| sed "s/Warning/$(shell printf "${yellow}Warning${no_ansi}")/g" \
+			| sed "s/Pod Conditions:/$(shell printf "☂${dim_green}${underline}Pod Conditions:${no_ansi}")/g" \
+			| sed "s/Pod Events:/$(shell printf "${underline}${dim_green}Pod Events:${no_ansi}")/g" \
+			| sed "s/Container Logs:/$(shell printf "${underline}${dim_green}Container Logs:${no_ansi}")/g" \
+			| sed "s/ContainerCreating/$(shell printf "${green}ContainerCreating${no_ansi}")/g" \
+			| sed "s/ErrImagePull/$(shell printf "${yellow}ErrImagePull${no_ansi}")/g" \
+			| sed "s/ImagePullBackOff/$(shell printf "${yellow}ImagePullBackOff${no_ansi}")/g" \
+			| sed ':a;N;$$!ba;s/\n\n/\n/g' \
+			| tr '☂' '\n' 2>/dev/null | ${stream.dim} > ${stderr} \
+		&& printf '\n'>/dev/stderr && $(call log, $${header} ${sep}${dim} $${stamp} ${sep} ${bold}Pods aren't ready yet) \
+		&& eval $${wait_cmd}; \
+	done \
+	&& tmp=`[ "${*}" == "all" ] && echo Cluster || echo Namespace` \
+	&& $(call log.k8s, $${header} ${sep}${dim} $${stamp} ${sep} $${tmp} ready ${GLYPH_SPARKLE})
+
+
+define containerized.maybe
+case $${CMK_INTERNAL} in 0)  ${log.target.rerouting} ; quiet=1 ${make} $(strip ${1}).dispatch/.$(strip ${@});; *) ${make} .$(strip ${@}) ;; esac
+endef
+
+k8s.stat:; $(call containerized.maybe, k8s)
+.k8s.stat:
 	@# Describes status for cluster, cluster auth, and namespaces.
 	@# Not pipe friendly, and not suitable for parsing!  
 	@#
@@ -830,17 +879,12 @@ k8s.stat:; $(call in.container, k8s)
 	@#
 	@# For a shorter, looping version that's suitable as a tmux widget, see 'k8s.stat.widget'
 	@#
-	case $${CMK_INTERNAL} in \
-		0)  ${log.target.rerouting} \
-			; quiet=1 ${make} k8s.dispatch/${@} \
-			; exit $$? ; ;; \
-		*) true \
-			&& tmp1=`kubectx -c||true` && tmp2=`kubens -c ||true` \
-			&& $(call log.k8s, k8s.stat ${no_ansi_dim}ctx=${green}${underline}$${tmp1}${no_ansi_dim} ns=${green}${underline}$${tmp2}) \
-			&& ${make} k8s.stat.env kubectl.stat.cluster \
-				kubectl.get.nodes kubectl.stat.auth  \
-				k8s.stat.ns k8s.stat.ctx; ;; \
-	esac
+	tmp1=`kubectx -c||true` && tmp2=`kubens -c ||true` \
+		&& $(call log.k8s, k8s.stat ${no_ansi_dim}ctx=${green}${underline}$${tmp1}${no_ansi_dim} ns=${green}${underline}$${tmp2}) \
+		&& ${make} k8s.stat.env kubectl.stat.cluster \
+			kubectl.get.nodes kubectl.stat.auth  \
+			k8s.stat.ns k8s.stat.ctx;
+
 k8s.test_harness.random:; ${make} k8s.test_harness/default/`uuidgen`
 	@# Starts a test-pod with a random name in the given namespace, optionally blocking until it's ready.
 	@#
@@ -997,7 +1041,7 @@ kubefwd.start/% k8s.namespace.fwd/%:
 		"") filter=$${filter:-}; ;; \
 		*) \
 			filter="-f metadata.name=$${svc_name}"; \
-			header="$${header} ${sep} ${bold_green}$${svc_name}"; ;; \
+			header="$${header} ${sep} ${green_bold}$${svc_name}"; ;; \
 	esac \
 	&& case "$${mapping}" in \
 		"") true; ;; \
@@ -1030,7 +1074,7 @@ ktop: ktop/all
 	@# Launches ktop tool.  
 	@# (This assumes 'ktop' is mentioned in 'KREW_PLUGINS')
 
-ktop/%:; $(call in.container, k8s)
+ktop/%:; $(call containerized.maybe, k8s)
 	@# Launches ktop tool for the given namespace.
 	@# This works from inside a container or from the host.
 	@#
