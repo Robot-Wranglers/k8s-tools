@@ -5,20 +5,20 @@
 #   This exercises `compose.mk`, `k8s.mk`, plus the `k8s-tools.yml` services to 
 #   interact with a small k3d cluster.  Verbs include: create, destroy, deploy, etc.
 #   
-#   This demo ships with the `k8s-tools` repository and runs as part of the test-suite.
+# This demo ships with the `k8s-tools` repository and runs as part of the test-suite.
 #
-#   See the documentation here[1] for more discussion.
+# See the documentation here[1] for more discussion.
 #
-#   USAGE: 
+# USAGE: 
 #
-#     # Default runs clean, create, deploy, test, but does not tear down the cluster
-#     make -f demos/argo-wf.mk
+#   # Default runs clean, create, deploy, test, but does not tear down the cluster
+#   ./demos/argo-wf.mk
 #
-#     # End-to-end, again without teardown 
-#     make -f demos/argo-wf.mk clean create deploy test
+#   # End-to-end, again without teardown 
+#   ./demos/argo-wf.mk clean create deploy test
 #
-#     # Finally, teardown the cluster
-#     make -f demos/argo-wf.mk teardown
+#   # Finally, teardown the cluster
+#   ./demos/argo-wf.mk teardown
 #
 # REF:
 #   [1] https://robot-wranglers.github.io/k8s-tools
@@ -27,7 +27,6 @@
 include compose.mk 
 include k8s.mk
 
-.DEFAULT_GOAL := __main__
 export K3D_VERSION:=v5.6.3
 
 # Ensure local KUBECONFIG exists & ignore anything from environment
@@ -43,8 +42,10 @@ __main__: clean create deploy test
 # https://argoproj.github.io/argo-events/quick_start/
 argo_namespace=argo
 argo_workflows_version="v3.6.4"
-argo_app_url=https://raw.githubusercontent.com/argoproj/argo-workflows/main/examples/hello-world.yaml
-argo_infra_url=https://github.com/argoproj/argo-workflows/releases/download/${argo_workflows_version}/quick-start-minimal.yaml
+argo_repo=https://github.com/argoproj/argo-workflows
+argo_repo_raw=https://raw.githubusercontent.com/argoproj/argo-workflows
+argo_app_url=${argo_repo_raw}/main/examples/hello-world.yaml
+argo_infra_url=${argo_repo}/releases/download/${argo_workflows_version}/quick-start-minimal.yaml
 
 # Generate target-scaffolding for k8s-tools.yml services
 $(eval $(call compose.import, k8s-tools.yml))
@@ -52,16 +53,19 @@ $(eval $(call compose.import, k8s-tools.yml))
 # BEGIN: Top-level
 #░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 
-clean cluster.clean teardown: flux.stage/cluster.clean k3d.dispatch/k3d.cluster.delete/$${CLUSTER_NAME}
+clean cluster.clean teardown: \
+  flux.stage/cluster.clean \
+  k3d.dispatch/k3d.cluster.delete/$${CLUSTER_NAME}
+
 create cluster.create: \
 	flux.stage/cluster.create \
 	k3d.dispatch/flux.do.unless/self.cluster.create,self.cluster.exists
-: flux.stage/cluster.teardown cluster.teardown
 self.cluster.create: k3d.cluster.get_or_create/$${CLUSTER_NAME}
 
 wait cluster.wait: k8s.cluster.wait
+
+deploy.pre: flux.stage/cluster.deploy
 deploy cluster.deploy: \
-	flux.stage/cluster.deploy \
 	flux.loop.until/k8s.cluster.ready \
 	infra.setup
 	

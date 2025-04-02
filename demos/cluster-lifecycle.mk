@@ -1,3 +1,4 @@
+#!/usr/bin/env -S ./compose.mk mk.interpret
 #!/usr/bin/env -S make -f
 # demos/cluster-lifecycle.mk: 
 #   Demonstrating full cluster lifecycle automation with k8s-tools.git.
@@ -30,7 +31,7 @@ include k8s.mk
 
 # Override k8s-tools.yml service-defaults, 
 # explicitly setting the k3d version used
-export K3D_VERSION:=v5.6.3
+# export K3D_VERSION:=v5.6.3
 
 # Cluster details that will be used by k3d.
 export CLUSTER_NAME:=k8s-tools-e2e
@@ -51,12 +52,16 @@ $(eval $(call compose.import, k8s-tools.yml, ▰))
 __main__: flux.and/clean,create,deploy,test
 
 #░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+clean.pre: flux.stage/cluster.clean
+clean cluster.clean: \
+	k3d.dispatch/k3d.cluster.delete/$${CLUSTER_NAME}
 
-clean cluster.clean: flux.stage/cluster.clean k3d.dispatch/k3d.cluster.delete/$${CLUSTER_NAME}
+create.pre: flux.stage/cluster.create
 create cluster.create: \
-	flux.stage/cluster.create \
 	k3d.dispatch/flux.do.unless/self.cluster.create,self.cluster.exists
-teardown: flux.stage/cluster.teardown cluster.teardown
+
+teardown.pre: flux.stage/cluster.teardown 
+teardown: cluster.teardown
 
 wait cluster.wait: k8s.cluster.wait
 self.cluster.exists: k3d.has_cluster/$${CLUSTER_NAME}
@@ -64,8 +69,8 @@ self.cluster.create: k3d.cluster.get_or_create/$${CLUSTER_NAME}
 
 #░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 
+deploy.pre: flux.stage/cluster.deploy
 deploy cluster.deploy: \
-	flux.stage/cluster.deploy \
 	flux.loop.until/k8s.cluster.ready \
 	deploy.helm deploy.test_harness deploy.prometheus
 	# add a label to the default namespace
@@ -81,6 +86,8 @@ deploy.prometheus:
 fwd.grafana:
 	mapping="80:8081" ${make} kubefwd.start/prometheus/grafana
 	$(call log.k8s, looking up grafana password) 
+	${make} k8s.dispatch/.fwd.grafana 
+.fwd.grafana: 
 	grafana_password=`kubectl get secret --namespace prometheus grafana -o jsonpath="{.data.admin-password}"\
 	| base64 --decode` \
 	&& printf "http://admin:$${grafana_password}@grafana:8081\n"
@@ -112,8 +119,9 @@ cluster.teardown:
 
 #░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 
+test.pre: flux.stage/cluster.test
 test: test.cluster test.contexts 
-test.cluster cluster.test: flux.stage/cluster.test cluster.wait
+test.cluster cluster.test: cluster.wait
 	label="Showing kubernetes status" \
 		${make} io.print.banner k8s.stat 
 	label="Previewing topology for default namespace" \
@@ -125,8 +133,8 @@ test.cluster cluster.test: flux.stage/cluster.test cluster.wait
 
 test.contexts: 
 	@# Helpers for displaying platform info 
-	label="Demo pod connectivity" ${make} io.print.banner 
-	${make} get.compose.ctx get.pod.ctx 
+	label="Demo pod connectivity" \
+		${make} io.print.banner get.compose.ctx get.pod.ctx 
 
 get.compose.ctx:
 	@# Runs on the container defined by compose service
@@ -138,4 +146,4 @@ get.pod.ctx:
 
 #░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 
-cluster.shell: k8s.dispatch/k8s.shell/${POD_NAMESPACE}/${POD_NAME}
+cluster.shell: k8s.dispatch/kubectl.shell/${POD_NAMESPACE}/${POD_NAME}

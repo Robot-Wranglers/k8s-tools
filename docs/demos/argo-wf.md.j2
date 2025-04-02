@@ -3,7 +3,7 @@
 ## Argo Workflows Demo
 <hr style="width:100%;border-bottom:3px solid black;">
 
-The argo workflows demo shows an example of a project-local kubernetes cluster that's bootstrapped with argo, plus workflow dispatch.  It's managed via [`k8s.mk`]({{mkdocs.site_relative_url}}), which is orchestrating usage of several different tools like `k3d`, `kubectl`, `helm`, and `argo`.
+This demo shows an example of a project-local kubernetes cluster that bootstraps [Argo Workflows](#), then exercises workflows by dispatching them, reading logs, etc.  It's managed via [`k8s.mk`]({{mkdocs.site_relative_url}}/k8s.mk), which is orchestrating usage of several different tools like `k3d`, `kubectl`, `helm`, and `argo`.
 
 There are no host dependencies at all except for `make` and `docker`, and the entire thing runs locally or [inside of github actions]({{github.actions_url}}/argo-wf.yml).
 
@@ -25,9 +25,6 @@ $ ./demos/argo-wf.mk
 
 # End-to-end, again without teardown 
 $ ./demos/argo-wf.mk clean create deploy test
-
-# Interactive shell for a cluster pod
-$ ./demos/argo-wf.mk cluster.shell 
 
 # Finally, teardown the cluster
 $ ./demos/argo-wf.mk teardown
