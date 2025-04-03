@@ -1,4 +1,4 @@
-#!/usr/bin/env -S bash -m 
+#!/usr/bin/env -S K8SMK_STANDALONE=1 make -f
 #░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 # k8s.mk: 
 #   Automation library/framework/tool building on compose.mk and k8s-tools.yml
@@ -43,25 +43,19 @@ GLYPH_K8S=${green}⑆${dim}
 log.k8s=$(call log, ${GLYPH_K8S} ${1})
 
 # Hints for exactly how k8s.mk is being invoked 
-export K8S_MK_SRC=$(shell echo ${MAKEFILE_LIST}|sed 's/ /\n/g' | grep k8s.mk)
-ifeq ($(findstring k8s.mk, ${MAKE_CLI}),)
-export K8S_MK_LIB=1
-export K8S_MK_STANDALONE=0
-else
-export K8S_MK_LIB=0
-export K8S_MK_STANDALONE=1
-endif
+export K8SMK_STANDALONE?=0
+export K8S_MK_SRC=$(shell echo ${MAKEFILE_LIST} | sed 's/ /\n/g' | grep k8s.mk)
 K8S_TOOLS=`dirname ${K8S_MK_SRC}`/k8s-tools.yml
-
-# ifeq (,$(filter compose.mk,$(MAKEFILE_LIST)))
-# include compose.mk
-# else
-# endif
+ifeq ($(K8SMK_STANDALONE),1)
+include compose.mk
+export K8S_MK_LIB=0
+else
+export K8S_MK_LIB=1
+endif
 
 # Import compose.mk iff we're in stand-alone mode.
-ifeq ($(K8S_MK_STANDALONE),1)
-$(eval $(call compose.import, $(shell dirname ${K8S_MK_SRC}||echo .)/k8s-tools.yml))
-loadf: self.loadf
+ifeq ($(K8SMK_STANDALONE),1)
+$(eval $(call compose.import, ${K8S_TOOLS}))
 endif
 
 # Extra repos that are included in 'docker.images' output.  
@@ -234,18 +228,16 @@ ansible.run/%: .ansible.require
 ##   [1] https://robot-wranglers.github.io/k8s-tools/api#api-helm
 #░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 
-helm.chart.install:
-	@#
-	@#
-	@#
-	@#
-	$(call log.part1, $${header} ) \
-	&& ${make} helm.release.stat/$${name} 2>/dev/null \
-	; case $$? in \
-		0) ($(call log.part2, ${dim_green}ok); ${make} helm.release.status/$${name} );; \
-		*) ($(call log.part2, ${dim_ital}missing) \
-			&& ${trace_maybe} && helm install $${name} $${chart_ref} -o json | jq .info);; \
-	esac
+# helm.chart.install:
+# 	@#
+# 	@#
+# 	$(call log.part1, $${header} ) \
+# 	&& ${make} helm.release.stat/$${name} 2>/dev/null \
+# 	; case $$? in \
+# 		0) ($(call log.part2, ${dim_green}ok); ${make} helm.release.status/$${name} );; \
+# 		*) ($(call log.part2, ${dim_ital}missing) \
+# 			&& ${trace_maybe} && helm install $${name} $${chart_ref} -o json | jq .info);; \
+# 	esac
 helm.repo.list: helm.dispatch/.helm.repo.list
 	@# Returns JSON for the currently available helm repositories.
 .helm.repo.list:; helm repo list -o json
@@ -309,17 +301,21 @@ io.curl=curl -sSL
 k3d.cluster.exists/% k3d.has_cluster/%:; k3d cluster list | grep ${*}
 	@# Succeeds iff cluster exists.
 
-k3d.cluster.get_or_create/%:
-	@#
-	@#
-	@#
-	@#
+k3d.cluster.get_or_create/%:; $(call containerized.maybe, k3d)
+	@# Create a k3d cluster if it does not already exist.
+.k3d.cluster.get_or_create/%:
 	$(call log.k8s, k3d.cluster.get_or_create ${sep} ${bold}${*})
 	${make} flux.do.unless/k3d.cluster.create/${*},k3d.has_cluster/${*}
+
 k3d.cluster.create/%:
+	@# Creates a k3d cluster with the given name, using the given configuration.
+	@# This supports most of the usual command-line options, but they are passed 
+	@# as variables.
 	@#
-	@#
-	@#
+	@# USAGE:
+	@#   k3d_servers=.. k3d_agents=.. 
+	@#   k3d_port=.. k3d_api_port=.. 
+	@#     ./k8s.mk k3d.cluster.create/<cluster_name>
 	@#
 	$(call log.k8s, k3d.cluster.create ${sep} ${bold}${*})
 	tmp=`pwd` && set -x \
@@ -330,13 +326,12 @@ k3d.cluster.create/%:
 		--port "$${k3d_port:-12000:12000@agent:0}" \
 		--volume $${tmp}/:/${*}@all --wait
 
-# k3d.cluster.missing/%:; ${make} flux.negate/k3d.has_cluster/${*}
-k3d.cluster.delete/%:
+k3d.cluster.delete/%:; $(call containerized.maybe, k3d)
 	@# Idempotent version of k3d cluster delete 
 	@#
 	@# USAGE:
 	@#   ./k8s.mk k3d.cluster.delete/<cluster_name>
-	@#
+.k3d.cluster.delete/%:
 	$(call log.k8s, ${@} ${sep} Deleting cluster ${sep}${underline}${*})
 	(set -x && k3d cluster delete ${*}) || true
 
@@ -526,7 +521,7 @@ kubectl.exec.pipe/%:
 	&& ${stream.stdin} | docker compose -f ${K8S_TOOLS} run -T k8s \
 		sh -x -c "KUBECONFIG=${KUBECONFIG} kubectl exec -n $${namespace} -i $${pod_name} -- bash"
 
-kubectl.shell/%:
+k8s.pod.shell/%:
 	@# This drops into a debugging shell for the named pod using `kubectl exec`,
 	@# plus a streaming version of the same which allows for working with pipes.
 	@#
@@ -540,10 +535,10 @@ kubectl.shell/%:
 	@#
 	@# USAGE: Interactive shell in pod:
 	@#   ./k8s.mk k8s.shell/<namespace>/<pod_name>
-	namespace=$(shell echo ${*}|awk -F/ '{print $$1}') \
-	&& pod_name=$(shell echo ${*}|awk -F/ '{print $$2}') \
-	&& docker compose -f `dirname ${K8S_MK_SRC}`/k8s-tools.yml run k8s \
-		sh -x -c "KUBECONFIG=${KUBECONFIG} kubectl exec -n $${namespace} -it $${pod_name} -- bash"
+	namespace=`echo ${*}|awk -F/ '{print $$1}'` \
+	&& pod_name=`echo ${*}|awk -F/ '{print $$2}'` \
+	&& script="KUBECONFIG=${KUBECONFIG} kubectl exec -n $${namespace} -it $${pod_name} -- bash" \
+	&& docker compose -f ${K8S_TOOLS} run k8s sh -x -c "$${script}"
 
 kubectl.get.nodes:
 	@# Status for nodes. 
@@ -813,11 +808,6 @@ k8s.cluster.ready k8s.ready:
 	done \
 	&& tmp=`[ "${*}" == "all" ] && echo Cluster || echo Namespace` \
 	&& $(call log.k8s, $${header} ${sep}${dim} $${stamp} ${sep} $${tmp} ready ${GLYPH_SPARKLE})
-
-
-define containerized.maybe
-case $${CMK_INTERNAL} in 0)  ${log.target.rerouting} ; quiet=1 ${make} $(strip ${1}).dispatch/.$(strip ${@});; *) ${make} .$(strip ${@}) ;; esac
-endef
 
 k8s.stat:; $(call containerized.maybe, k8s)
 .k8s.stat:
@@ -1145,3 +1135,14 @@ promtool.pull:
 	&& cat $${tmpf} | spark
 
 #░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+
+# This reroutes target invocation to a container if necessary, or otherwise 
+# executes the target directly.  See the usage example for more info.
+#
+# USAGE:
+#   foo:; $(call containerized.maybe, container_name)
+#   .foo:; echo hello-world
+#
+define containerized.maybe
+case $${CMK_INTERNAL} in 0)  ${log.target.rerouting} ; quiet=1 ${make} $(strip ${1}).dispatch/.$(strip ${@});; *) ${make} .$(strip ${@}) ;; esac
+endef
