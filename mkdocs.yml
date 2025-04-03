@@ -49,10 +49,12 @@ nav:
   #   - 'K8s-tools.yml': 'k8s-tools.yml.md'
   #   - 'K8s.mk': 'k8s.mk.md'
   - API:
+    - 'Library Tour': 'lib.md'
     - 'Full API': 'api.md'
   - Demos:
     - 'End-to-End Cluster Lifecycle': demos/cluster-lifecycle.md
     - 'Argo Workflows Example': demos/argo-wf.md
+    - 'FaaS with Fission': demos/fission.md
   - Other:
     - 'Configuration / Env Vars': config.md
     - limitations.md
