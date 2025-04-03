@@ -71,6 +71,17 @@ export K8S_POLL_DELTA?=23
 # is providing or it can lead to confusion.
 export IMG_ALPINE_K8S?=alpine/k8s:1.30.0
 
+# This reroutes target invocation to a container if necessary, or otherwise 
+# executes the target directly.  See the usage example for more info.
+#
+# USAGE:
+#   foo:; $(call containerized.maybe, container_name)
+#   .foo:; echo hello-world
+#
+define containerized.maybe
+case $${CMK_INTERNAL} in 0)  ${log.target.rerouting} ; quiet=1 ${make} $(strip ${1}).dispatch/.$(strip ${@});; *) ${make} .$(strip ${@}) ;; esac
+endef
+
 #░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 ## END Data & Macros
 ## BEGIN 'ansible.*' targets
@@ -323,8 +334,9 @@ k3d.cluster.create/%:
 		--servers $${k3d_servers:-3} \
 		--agents $${k3d_agents:-3} \
 		--api-port $${k3d_api_port:-6551} \
-		--port "$${k3d_port:-12000:12000@agent:0}" \
 		--volume $${tmp}/:/${*}@all --wait
+
+# --port "$${k3d_port:-12000:12000@agent:0}" \
 
 k3d.cluster.delete/%:; $(call containerized.maybe, k3d)
 	@# Idempotent version of k3d cluster delete 
@@ -423,8 +435,8 @@ k3d.stat:
 ##   [1] https://robot-wranglers.github.io/k8s-tools/api#api-k8s
 #░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 
-
-kubectl.get/%:
+k8s.get/% kubectl.get/%:; $(call containerized.maybe, k8s)
+.k8s.get/% .kubectl.get/%:
 	@# Returns resources under the given namespace, for the given kind.
 	@# This can also be used with a 'jq' query to grab deeply nested results.
 	@# Pipe Friendly: results are always JSON.  Caller should handle errors.
@@ -733,7 +745,7 @@ k8s.namespace.label/%:
 	; printf "\"$${key}\": \"$${val}\"}}}}") | ${jq} . \
 	| ${make} k8s.ansible
 
-k8s.namespace.wait/%:
+k8s.namespace.wait/%:; $(call containerized.maybe, k8s)
 	@# Waits for every pod in the given namespace to be ready.
 	@#
 	@# This uses only kubectl/jq to loop on pod-status, but assumes that 
@@ -747,25 +759,6 @@ k8s.namespace.wait/%:
 	@#
 	@# REFS:
 	@#   * `[1]`: https://github.com/alecjacobs5401/kubectl-sick-pods
-	@#
-	quiet=1 ${make} k8s.dispatch/.k8s.namespace.wait/${*}
-
-k8s.cluster.ready k8s.ready:
-	@# Checks whether the cluster is available.  
-	@# This just returns the exit status of cluster-info, and not 
-	@# whether pods are all in a ready state. For that, see 'k8s.wait'
-	@#
-	@# EXAMPLE: 
-	@#   ./k8s.mk k8s.cluster.ready
-	@#
-	@# EXAMPLE: ( in a loop )
-	@#   ./k8s.mk flux.loop.until/k8s.cluster.ready
-	@#
-	@# REFS:
-	@#   * `[1]`: https://github.com/alecjacobs5401/kubectl-sick-pods
-	@#
-	quiet=1 ${make} k8s.dispatch/kubectl.cluster.ready/$${KUBECONFIG}
-
 .k8s.namespace.wait/%:
 	@#
 	@#
@@ -809,6 +802,22 @@ k8s.cluster.ready k8s.ready:
 	&& tmp=`[ "${*}" == "all" ] && echo Cluster || echo Namespace` \
 	&& $(call log.k8s, $${header} ${sep}${dim} $${stamp} ${sep} $${tmp} ready ${GLYPH_SPARKLE})
 
+k8s.ready k8s.cluster.ready:; $(call containerized.maybe, k8s)
+	@# Checks whether the cluster is available.  
+	@# This just returns the exit status of cluster-info, and not 
+	@# whether pods are all in a ready state. For that, see 'k8s.wait'
+	@#
+	@# EXAMPLE: 
+	@#   ./k8s.mk k8s.cluster.ready
+	@#
+	@# EXAMPLE: ( in a loop )
+	@#   ./k8s.mk flux.loop.until/k8s.cluster.ready
+	@#
+	@# REFS:
+	@#   * `[1]`: https://github.com/alecjacobs5401/kubectl-sick-pods
+	@#
+.k8s.ready .k8s.cluster.ready: kubectl.cluster.ready/$${KUBECONFIG}
+
 k8s.stat:; $(call containerized.maybe, k8s)
 .k8s.stat:
 	@# Describes status for cluster, cluster auth, and namespaces.
@@ -831,7 +840,7 @@ k8s.test_harness.random:; ${make} k8s.test_harness/default/`uuidgen`
 	@# USAGE: 
 	@#	`k8s.test_harness.random`
 
-k8s.test_harness/%:
+k8s.test_harness/%:; $(call containerized.maybe, k8s)
 	@# Starts a test-pod in the given namespace, optionally blocking until it's ready.
 	@# When no image is provided, this will use 'IMG_ALPINE_K8S' as default.
 	@#
@@ -839,6 +848,7 @@ k8s.test_harness/%:
 	@#	`k8s.test_harness/<namespace>/<pod_name>` or 
 	@#	`k8s.test_harness/<namespace>/<pod_name>/<image>` 
 	@#
+.k8s.test_harness/%:
 	$(eval export pathcomp:=$(shell echo ${*}| sed -e 's/\// /g'))
 	$(eval export namespace:=$(strip $(shell echo ${*} | awk -F/ '{print $$1}'))) \
 	$(eval export pod_name:=$(strip $(shell echo ${*} | awk -F/ '{print $$2}'))) \
@@ -864,7 +874,6 @@ k8s.test_harness/%:
 		| jq . \
 		| (set -x && kubectl apply --namespace $${namespace} -f -) \
 	&& [ -z $${wait:-} ] && true || ${make} k8s.namespace.wait/$${namespace}
-
 
 k8s.wait k8s.cluster.wait: k8s.namespace.wait/all
 	@# Waits until all pods in all namespaces are ready.  (Alias for 'k8s.namespace.wait/all')
@@ -979,7 +988,7 @@ kubefwd.start/% k8s.namespace.fwd/%:
 		"") filter=$${filter:-}; ;; \
 		*) \
 			filter="-f metadata.name=$${svc_name}"; \
-			header="$${header} ${sep} ${green_bold}$${svc_name}"; ;; \
+			header="$${header} ${sep} ${bold_green}$${svc_name}"; ;; \
 	esac \
 	&& case "$${mapping}" in \
 		"") true; ;; \
@@ -1136,13 +1145,3 @@ promtool.pull:
 
 #░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 
-# This reroutes target invocation to a container if necessary, or otherwise 
-# executes the target directly.  See the usage example for more info.
-#
-# USAGE:
-#   foo:; $(call containerized.maybe, container_name)
-#   .foo:; echo hello-world
-#
-define containerized.maybe
-case $${CMK_INTERNAL} in 0)  ${log.target.rerouting} ; quiet=1 ${make} $(strip ${1}).dispatch/.$(strip ${@});; *) ${make} .$(strip ${@}) ;; esac
-endef
