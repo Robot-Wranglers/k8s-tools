@@ -1533,6 +1533,8 @@ io.with.color/%:
 	&& $(call io.mktemp) && ${make} $${target} 2>$${tmpf} \
 	&& printf "$(value $(shell echo ${*}| cut -d, -f1))`cat $${tmpf}`${no_ansi}\n" >/dev/stderr
 
+io.xargs=xargs -I% sh -x -c
+
 ##░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 ## END: io.* targets
 ## BEGIN: mk.* targets
