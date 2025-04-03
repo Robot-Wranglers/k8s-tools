@@ -36,8 +36,19 @@ export _:=$(shell umask 066;touch ${KUBECONFIG})
 # Cluster details that will be used by k3d.
 export CLUSTER_NAME:=k8s-tools-argowf
 
-# Default target should do everything, end to end.
+# Default entrypoint should do everything, end to end.
 __main__: clean create deploy test
+
+# Cluster lifecycle basics.  These are the same for all demos, and mostly just
+# setting up aliases for existing targets.  The `*.pre` targets setup hooks 
+# for declaring stage-entry.. this is part of formatting friendly output.#░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+clean.pre: flux.stage/cluster.clean
+clean cluster.clean teardown: k3d.cluster.delete/$${CLUSTER_NAME}
+create.pre: flux.stage/cluster.create
+create cluster.create: k3d.cluster.get_or_create/$${CLUSTER_NAME}
+wait cluster.wait: k8s.cluster.wait
+#░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+
 
 # https://argoproj.github.io/argo-events/quick_start/
 argo_namespace=argo
@@ -50,16 +61,6 @@ argo_infra_url=${argo_repo}/releases/download/${argo_workflows_version}/quick-st
 # Generate target-scaffolding for k8s-tools.yml services
 $(eval $(call compose.import, k8s-tools.yml))
 
-# BEGIN: Top-level
-#░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
-
-clean.pre: flux.stage/cluster.clean
-clean cluster.clean teardown: k3d.cluster.delete/$${CLUSTER_NAME}
-
-create.pre: flux.stage/cluster.create
-create cluster.create: k3d.cluster.get_or_create/$${CLUSTER_NAME}
-
-wait cluster.wait: k8s.cluster.wait
 
 deploy.pre: flux.stage/cluster.deploy
 deploy cluster.deploy: \
@@ -69,7 +70,7 @@ deploy cluster.deploy: \
 test.pre: flux.stage/test
 test: infra.test app.test
 
-infra.setup: flux.stage/infra.setup argo.dispatch/.infra.setup cluster.wait
+infra.setup: argo.dispatch/.infra.setup cluster.wait
 .infra.setup: k8s.kubens.create/${argo_namespace}
 	url="${argo_infra_url}" ${make} kubectl.apply.url
 

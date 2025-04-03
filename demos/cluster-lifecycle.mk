@@ -26,10 +26,6 @@
 include compose.mk 
 include k8s.mk
 
-# Override k8s-tools.yml service-defaults, 
-# explicitly setting the k3d version used
-# export K3D_VERSION:=v5.6.3
-
 # Cluster details that will be used by k3d.
 export CLUSTER_NAME:=k8s-tools-e2e
 
@@ -46,25 +42,20 @@ export POD_NAMESPACE?=default
 # Generate target-scaffolding for k8s-tools.yml services
 $(eval $(call compose.import, k8s-tools.yml, ▰))
 
-__main__: flux.and/clean,create,deploy,test
+# Default entrypoint should do everything, end to end.
+__main__: clean create deploy test
 
+# Cluster lifecycle basics.  These are the same for all demos, and mostly just
+# setting up aliases for existing targets.  The `*.pre` targets setup hooks 
+# for declaring stage-entry.. this is part of formatting friendly output.
 #░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 clean.pre: flux.stage/cluster.clean
-clean cluster.clean: \
-	k3d.dispatch/k3d.cluster.delete/$${CLUSTER_NAME}
-
+clean cluster.clean teardown: k3d.cluster.delete/$${CLUSTER_NAME}
 create.pre: flux.stage/cluster.create
-create cluster.create: \
-	k3d.dispatch/flux.do.unless/self.cluster.create,self.cluster.exists
-
-teardown.pre: flux.stage/cluster.teardown 
-teardown: cluster.teardown
-
+create cluster.create: k3d.cluster.get_or_create/$${CLUSTER_NAME}
 wait cluster.wait: k8s.cluster.wait
-self.cluster.exists: k3d.has_cluster/$${CLUSTER_NAME}
-self.cluster.create: k3d.cluster.get_or_create/$${CLUSTER_NAME}
-
 #░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+
 
 deploy.pre: flux.stage/cluster.deploy
 deploy cluster.deploy: \
