@@ -53,14 +53,11 @@ $(eval $(call compose.import, k8s-tools.yml))
 # BEGIN: Top-level
 #░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 
-clean cluster.clean teardown: \
-  flux.stage/cluster.clean \
-  k3d.dispatch/k3d.cluster.delete/$${CLUSTER_NAME}
+clean.pre: flux.stage/cluster.clean
+clean cluster.clean teardown: k3d.cluster.delete/$${CLUSTER_NAME}
 
-create cluster.create: \
-	flux.stage/cluster.create \
-	k3d.dispatch/flux.do.unless/self.cluster.create,self.cluster.exists
-self.cluster.create: k3d.cluster.get_or_create/$${CLUSTER_NAME}
+create.pre: flux.stage/cluster.create
+create cluster.create: k3d.cluster.get_or_create/$${CLUSTER_NAME}
 
 wait cluster.wait: k8s.cluster.wait
 
@@ -69,7 +66,8 @@ deploy cluster.deploy: \
 	flux.loop.until/k8s.cluster.ready \
 	infra.setup
 	
-test: flux.stage/test infra.test app.test
+test.pre: flux.stage/test
+test: infra.test app.test
 
 infra.setup: flux.stage/infra.setup argo.dispatch/.infra.setup cluster.wait
 .infra.setup: k8s.kubens.create/${argo_namespace}
@@ -86,7 +84,7 @@ app.test: argo.dispatch/.app.test
 	${mk.def.read}/argo.wf.template | ${argo.submit.stdin}
 	$(call io.mktemp) && ${mk.def.to.file}/argo.wf.template/$${tmpf} \
 	&& ${make} argo.submit/$${tmpf} 
-	&& url="${argo_app_url}" ${make} argo.submit.url
+	url="${argo_app_url}" ${make} argo.submit.url
 
 # BEGIN: Embedded data
 #░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░

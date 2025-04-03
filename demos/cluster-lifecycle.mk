@@ -5,11 +5,11 @@
 #   This exercises `compose.mk`, `k8s.mk`, plus the `k8s-tools.yml` services to 
 #   interact with a small k3d cluster.  Verbs include: create, destroy, deploy, etc.
 #   
-#   This demo ships with the `k8s-tools` repository and runs as part of the test-suite.
+# This demo ships with the `k8s-tools` repository and runs as part of the test-suite.
 #
-#   See the documentation here for more discussion: 
+# See the documentation here for more discussion: 
 #
-#   USAGE: 
+# USAGE: 
 #
 #     # Default entrypoint runs clean, create, deploy, test, but does not tear down the cluster.  
 #     ./demos/cluster-lifecycle.mk
@@ -19,9 +19,6 @@
 #
 #     # Interactive shell for a cluster pod
 #     ./demos/cluster-lifecycle.mk cluster.shell 
-#
-#     # 
-#     ./demos/cluster-lifecycle.mk cluster.show
 #
 #     # Finally, teardown the cluster
 #     ./demos/cluster-lifecycle.mk teardown
@@ -112,7 +109,7 @@ self.test_harness.deploy: \
 	kubectl.apply/demos/data/nginx.svc.yml
 
 cluster.teardown:
-	${json.from} wait=yes kind=Pod state=absent name=${POD_NAME} namespace=${POD_NAMESPACE} \
+	${json.from} name=${POD_NAME} namespace=${POD_NAMESPACE} wait=yes kind=Pod state=absent \
 	| ${make} k8s.ansible
 	${json.from} wait=true name=ahoy state=absent release_namespace=default \
 	| ${make} ansible.helm 
@@ -146,4 +143,6 @@ get.pod.ctx:
 
 #░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 
-cluster.shell: k8s.dispatch/kubectl.shell/${POD_NAMESPACE}/${POD_NAME}
+cluster.shell: k8s.pod.shell/${POD_NAMESPACE}/${POD_NAME}
+	@# Opens an interactive shell into the test-pod.
+	@# This requires that `deploy.test_harness` has already run.
