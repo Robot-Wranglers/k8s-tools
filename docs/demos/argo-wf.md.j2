@@ -1,15 +1,45 @@
 {% import 'macros.j2' as macros -%}
 
 ## Argo Workflows Demo
-
 <hr style="width:100%;border-bottom:3px solid black;">
 
-<hr style="width:95%;border-bottom:1px dashed black;">
+This demo shows an example of a project-local kubernetes cluster that bootstraps [Argo Workflows](https://argoproj.github.io/workflows/), then exercises workflows by dispatching them, reading logs, etc.  There are no host dependencies at all except for `make` and `docker`, and the entire thing runs locally or [inside of github actions]({{github.actions_url}}/argo-wf.yml).
 
-``` Makefile
+Since `k8s.mk` is built on top of [compose.mk]({{jinja.vars.composemk_docs_url}}), you'll want some of that background to completely understand the [demo code](#source-code), but for the most part it should be pretty easy to read and adapt.
+
+### Basic Usage
+<hr style="width:100%;border-bottom:3px solid black;">
+
+```bash 
+
+# Default entrypoint runs clean, create, deploy, test, but does not tear down the cluster.  
+$ ./demos/argo-wf.mk
+
+# End-to-end, again without teardown 
+$ ./demos/argo-wf.mk clean create deploy test
+
+# Finally, teardown the cluster
+$ ./demos/argo-wf.mk teardown
+```
+
+### End-to-End Output
+<hr style="width:100%;border-bottom:3px solid black;">
+
+Placeholder
+
+{{macros.img_link("argo-wf.png", mkdocs, "33%")}}
+
+### Interactive Workflows
+<hr style="width:100%;border-bottom:3px solid black;">
+
+Placeholder
+
+### Source Code 
+<hr style="width:100%;border-bottom:3px solid black;">
+
+```Makefile
 {{open('demos/argo-wf.mk','r').read().strip()}}
 ```
-<hr style="width:95%;border-bottom:1px dashed black;">
+
 
 <hr style="width:100%;border-bottom:3px solid black;">
-

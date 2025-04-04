@@ -1,36 +1,30 @@
 #!/usr/bin/env -S make -f
+#░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 # demos/cluster-lifecycle.mk: 
 #   Demonstrating full cluster lifecycle automation with k8s-tools.git.
 #   This exercises `compose.mk`, `k8s.mk`, plus the `k8s-tools.yml` services to 
 #   interact with a small k3d cluster.  Verbs include: create, destroy, deploy, etc.
 #   
-#   This demo ships with the `k8s-tools` repository and runs as part of the test-suite.
+# This demo ships with the `k8s-tools` repository and runs as part of the test-suite.
 #
-#   See the documentation here for more discussion: 
+# See the documentation here for more discussion: 
 #
-#   USAGE: 
+# USAGE: 
 #
-#     # Default entrypoint runs clean, create, deploy, test, but does not tear down the cluster.  
-#     ./demos/cluster-lifecycle.mk
+#   # Default: clean/create/deploy/test for cluster without any teardown
+#   ./demos/cluster-lifecycle.mk
 #
-#     # End-to-end, again without teardown 
-#     ./demos/cluster-lifecycle.mk clean create deploy test
+#   # End-to-end, again without teardown 
+#   ./demos/cluster-lifecycle.mk clean create deploy test
 #
-#     # Interactive shell for a cluster pod
-#     ./demos/cluster-lifecycle.mk cluster.shell 
+#   # Interactive shell for a cluster pod
+#   ./demos/cluster-lifecycle.mk cluster.shell 
 #
-#     # 
-#     ./demos/cluster-lifecycle.mk cluster.show
-#
-#     # Finally, teardown the cluster
-#     ./demos/cluster-lifecycle.mk teardown
+#   # Finally, teardown the cluster
+#   ./demos/cluster-lifecycle.mk teardown
+#░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 
-include compose.mk 
 include k8s.mk
-
-# Override k8s-tools.yml service-defaults, 
-# explicitly setting the k3d version used
-export K3D_VERSION:=v5.6.3
 
 # Cluster details that will be used by k3d.
 export CLUSTER_NAME:=k8s-tools-e2e
@@ -48,25 +42,25 @@ export POD_NAMESPACE?=default
 # Generate target-scaffolding for k8s-tools.yml services
 $(eval $(call compose.import, k8s-tools.yml, ▰))
 
-__main__: flux.and/clean,create,deploy,test
+# Default entrypoint should do everything, end to end.
+__main__: clean create deploy test
 
-###############################################################################
-
-clean cluster.clean: flux.stage/cluster.clean k3d.dispatch/k3d.cluster.delete/$${CLUSTER_NAME}
-create cluster.create: \
-	flux.stage/cluster.create \
-	k3d.dispatch/self.cluster.maybe.create
-teardown: flux.stage/cluster.teardown cluster.teardown
-
+# Cluster lifecycle basics.  These are the same for all demos, and mostly just
+# setting up aliases for existing targets.  The `*.pre` targets setup hooks 
+# for declaring stage-entry.. this is part of formatting friendly output.
+#░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+clean.pre: flux.stage/cluster.clean
+clean cluster.clean teardown: k3d.cluster.delete/$${CLUSTER_NAME}
+create.pre: flux.stage/cluster.create
+create cluster.create: k3d.cluster.get_or_create/$${CLUSTER_NAME}
 wait cluster.wait: k8s.cluster.wait
-self.cluster.maybe.create: flux.do.unless/self.cluster.create,self.cluster.exists
-self.cluster.exists: k3d.has_cluster/$${CLUSTER_NAME}
-self.cluster.create: k3d.cluster.get_or_create/$${CLUSTER_NAME}
 
-###############################################################################
+# Finished with boilerplate.  Describe the local deploy/test process
+#░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 
+
+deploy.pre: flux.stage/cluster.deploy
 deploy cluster.deploy: \
-	flux.stage/cluster.deploy \
 	flux.loop.until/k8s.cluster.ready \
 	deploy.helm deploy.test_harness deploy.prometheus
 	# add a label to the default namespace
@@ -79,21 +73,6 @@ deploy.prometheus:
 		chart_repo_url="https://prometheus-community.github.io/helm-charts" \
 	| ${make} ansible.helm
 
-fwd.grafana:
-	mapping="80:8081" ${make} kubefwd.start/prometheus/grafana
-	$(call log.k8s, looking up grafana password) 
-	grafana_password=`kubectl get secret --namespace prometheus grafana -o jsonpath="{.data.admin-password}"\
-	| base64 --decode` \
-	&& printf "http://admin:$${grafana_password}@grafana:8081\n"
-	
-deploy.grafana:
-	${json.from} \
-		name=grafana chart_ref=grafana \
-		wait=yes values:raw='{"adminPassword":"test"}' \
-		create_namespace=yes release_namespace=prometheus \
-		chart_repo_url=https://grafana.github.io/helm-charts \
-	| ${make} ansible.helm
-	
 deploy.helm:
 	${json.from} name=ahoy chart_ref=hello-world \
 		release_namespace=default chart_repo_url="https://helm.github.io/examples" \
@@ -103,18 +82,13 @@ deploy.test_harness: flux.retry/3/k8s.dispatch/self.test_harness.deploy
 self.test_harness.deploy: \
 	k8s.kubens.create/${POD_NAMESPACE} \
 	k8s.test_harness/${POD_NAMESPACE}/${POD_NAME} \
-	k8s.kubectl.apply/demos/data/nginx.svc.yml
+	kubectl.apply/demos/data/nginx.svc.yml
 
-cluster.teardown:
-	${json.from} wait=yes kind=Pod state=absent name=${POD_NAME} namespace=${POD_NAMESPACE} \
-	| ${make} k8s.ansible
-	${json.from} wait=true name=ahoy state=absent release_namespace=default \
-	| ${make} ansible.helm 
+#░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 
-###############################################################################
-
+test.pre: flux.stage/cluster.test
 test: test.cluster test.contexts 
-test.cluster cluster.test: flux.stage/cluster.test cluster.wait
+test.cluster cluster.test: cluster.wait
 	label="Showing kubernetes status" \
 		${make} io.print.banner k8s.stat 
 	label="Previewing topology for default namespace" \
@@ -126,17 +100,19 @@ test.cluster cluster.test: flux.stage/cluster.test cluster.wait
 
 test.contexts: 
 	@# Helpers for displaying platform info 
-	label="Demo pod connectivity" ${make} io.print.banner 
-	${make} get.compose.ctx get.pod.ctx 
+	label="Demo pod connectivity" \
+		${make} io.print.banner get.compose.ctx get.pod.ctx 
 
 get.compose.ctx:
 	@# Runs on the container defined by compose service
-	echo uname -n | ${make} k8s-tools/k8s/shell/pipe
+	echo uname -n | ${make} k8s.shell.pipe
 
 get.pod.ctx:
 	@# Runs inside the kubernetes cluster
-	echo uname -n | ${make} k8s.shell/${POD_NAMESPACE}/${POD_NAME}/pipe
+	echo uname -n | ${make} kubectl.exec.pipe/${POD_NAMESPACE}/${POD_NAME}
 
-###############################################################################
+#░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 
-cluster.shell: k8s.shell/${POD_NAMESPACE}/${POD_NAME}
+cluster.shell: k8s.pod.shell/${POD_NAMESPACE}/${POD_NAME}
+	@# Opens an interactive shell into the test-pod.
+	@# This requires that `deploy.test_harness` has already run.

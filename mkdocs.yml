@@ -48,10 +48,16 @@ nav:
   # - Core Components:
   #   - 'K8s-tools.yml': 'k8s-tools.yml.md'
   #   - 'K8s.mk': 'k8s.mk.md'
-  - API:
+  - 'Library & API':
+    - 'Library Overview': 'lib.md'
     - 'Full API': 'api.md'
+  - Stand Alone Mode:
+    - 'Tool Overview': 'tool-overview.md'
   - Demos:
     - 'End-to-End Cluster Lifecycle': demos/cluster-lifecycle.md
+    - 'Argo Workflows Example': demos/argo-wf.md
+    - 'Argo Events Example': demos/argo-events.md
+    - 'FaaS with Fission': demos/fission.md
   - Other:
     - 'Configuration / Env Vars': config.md
     - limitations.md

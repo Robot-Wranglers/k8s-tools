@@ -1,3 +1,5 @@
+{% import 'macros.j2' as macros -%}
+
 # Known Limitations and Issues
 <hr style="width:100%;border-bottom:3px solid black;">
 
@@ -12,12 +14,14 @@ Dealing with per-project KUBECONFIGs is best, where you can set that inside your
 
 By default, the compose file shares the working directory with containers it's using as volumes.  **This means files you're using should be inside or somewhere below the working directory!**  The compose file itself can be anywhere though, so instead of keeping it in your projects source-tree you can decide to deploy it separately to `/opt` or `~/.config`
 
+{#
 #### General Argument Passing
 -------------------------------------------
 
 Unfortunately, there's not a good way to convince `make` to just proxy arguments without parsing them.  **For example `./k8s.mk kubectl apply -f` looks convenient, but it won't work.**  (It will instead parse `apply -f` as arguments to make.)  
 
 The simplest workaround is to just use `cmd="apply ..." ./k8s.mk kubectl`.  However if [supervisors and signals](#supervisors-and-signals) are supported, then you can use the special form ' -- ', as in "./k8s.mk kubectl -- version --client".  See also [the smoke-tests]({{github.repo_url}}/tree/master/tests/Makefile.smoke-test-k8s.mk).
+#}
 
 #### Docker and File Permissions 
 -------------------------------------------

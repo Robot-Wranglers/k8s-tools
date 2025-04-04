@@ -1,6 +1,7 @@
 {% import 'macros.j2' as macros -%}
 
 ## Cluster Lifecycle Demo
+<hr style="width:100%;border-bottom:3px solid black;">
 
 The cluster lifecycle demo shows an example of a project-local kubernetes cluster.  It's managed via [`k8s.mk`]({{mkdocs.site_relative_url}}), which is orchestrating usage of several different tools like `k3d`, `kubectl`, `helm`, and `ansible` to install things like Nginx and Prometheus.
 
@@ -22,14 +23,11 @@ Running the demo is simple:
 # Default entrypoint runs clean, create, deploy, test, but does not tear down the cluster.  
 $ ./demos/cluster-lifecycle.mk
 
-# End-to-end, again without teardown 
+# End-to-end, again without teardown
 $ ./demos/cluster-lifecycle.mk clean create deploy test
 
 # Interactive shell for a cluster pod
 $ ./demos/cluster-lifecycle.mk cluster.shell 
-
-# 
-$ ./demos/cluster-lifecycle.mk cluster.show
 
 # Finally, teardown the cluster
 $ ./demos/cluster-lifecycle.mk teardown
@@ -45,7 +43,11 @@ The following *(large)* image shows the full output of `./demos/cluster-lifecycl
 ### Interactive Workflows
 <hr style="width:100%;border-bottom:3px solid black;">
 
-Placeholder
+One aspect of the demo that hasn't been exercised yet by the end-to-end example above is grafana installation.
+
+```bash 
+$ ./demos/cluster-lifecycle.mk deploy.grafana
+```
 
 ### Source Code 
 <hr style="width:100%;border-bottom:3px solid black;">

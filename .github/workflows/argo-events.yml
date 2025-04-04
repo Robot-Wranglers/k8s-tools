@@ -1,0 +1,25 @@
+# See also: https://docs.github.com/en/actions
+name: Argo Events Demo
+on:
+  workflow_dispatch: {}
+  workflow_call: {}
+  push:
+    branches: [ "main" ]
+    paths-ignore:  ['**.gif', '**.md', '**.md.j2', '**.mmd', '**.png', '**.svg']
+  pull_request:
+    branches: [ "main" ]
+    paths-ignore:  ['**.gif', '**.md', '**.md.j2', '**.mmd', '**.png', '**.svg']
+permissions:
+  contents: read
+jobs:
+  test:
+    name: Argo Events Demo
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Initialize
+        run: make clean init build
+      - name: Run Argo Events Demo
+        run: ./demos/argo-events.mk
+        env:
+          COLUMNS: 150
