@@ -347,17 +347,18 @@ services:
 
   # https://github.com/kubernetes-sigs/kind
   kind: 
+    <<: *base
     hostname: "k8s:kind"
     build:
       tags: ['k8s:kind']
       context: .
       dockerfile_inline: |
-        FROM debian
-        RUN apt-get update -qq && apt-get install -qq -y curl
-        RUN [ $(uname -m) = x86_64 ] \
-          && curl -Lo /usr/bin/kind https://kind.sigs.k8s.io/dl/${KIND_CLI_VERSION:-v0.23.0}/kind-$(uname)-amd64 \
-          && chmod o+x /usr/bin/kind
-    entrypoint: /usr/bin/kind
+        FROM k8s:base AS base
+        USER root
+        RUN curl -fsSL -o/usr/local/bin/kind https://kind.sigs.k8s.io/dl/${KIND_CLI_VERSION:-v0.27.0}/kind-linux-amd64
+        RUN chmod +x /usr/local/bin/kind
+        USER ${DOCKER_UGNAME:-root}
+    entrypoint: /usr/local/bin/kind
 
   # https://k9scli.io/
   k9s:
