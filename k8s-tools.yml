@@ -39,9 +39,9 @@ services:
       tags: ['k8s:base', 'k8s:k8s']
       context: .
       dockerfile_inline: |
-        FROM ${ALPINE_K8S_VERSION:-alpine/k8s:1.30.0} as builder
+        FROM ${ALPINE_K8S_VERSION:-alpine/k8s:1.30.0} AS builder
         RUN cp /krew-* /usr/bin/krew
-        FROM ghcr.io/charmbracelet/gum as gum
+        FROM ghcr.io/charmbracelet/gum AS gum
         FROM ${ALPINE_K8S_VERSION:-alpine/k8s:1.30.0} 
         COPY --from=gum /usr/local/bin/gum /usr/bin
         COPY --from=builder /usr/bin/krew /usr/bin/
@@ -152,7 +152,7 @@ services:
     <<: *base
     entrypoint: awscli
     hostname: k8s:awscli
-  
+
   # https://docs.aws.amazon.com/cdk
   # FIXME: needs a python stack for many use-cases
   cdk:
@@ -189,7 +189,7 @@ services:
     <<: *base
     entrypoint: kubeconform
     hostname: k8s:kubeconform
-  
+
   # https://knative.dev/docs/client/install-kn/
   kn: &knative
     <<: *base
@@ -199,13 +199,27 @@ services:
       tags: ['k8s:kn']
       context: .
       dockerfile_inline: |
-        FROM k8s:base as base
-        FROM ghcr.io/knative/func/func as builder
+        FROM k8s:base AS base
+        FROM ghcr.io/knative/func/func AS builder
         FROM gcr.io/knative-releases/knative.dev/client/cmd/kn:${KN_CLI_VERSION:-v1.14.0}
         COPY --from=builder /ko-app/func /ko-app/func
         COPY --from=base /usr/bin/kubectl /usr/bin/
         RUN apk --no-cache add bash procps make
         RUN cp /ko-app/func /usr/bin/kn-func
+
+  # https://hub.docker.com/r/istio/istioctl/
+  istioctl:
+    <<: *base
+    entrypoint: istioctl
+    depends_on: ['k8s']
+    hostname: k8s:istioctl
+    build:
+      tags: ['k8s:istioctl']
+      context: .
+      dockerfile_inline: |
+        FROM istio/istioctl:${ISTIO_CONTAINER_VERSION:-1.24.5} AS builder
+        FROM k8s:base AS base
+        COPY --from=builder /usr/local/bin/istioctl /usr/local/bin/istioctl
 
   # https://github.com/arttor/helmify
   helmify:
@@ -242,7 +256,6 @@ services:
         USER ${DOCKER_UGNAME:-root}
     entrypoint: fission
 
-
   # https://github.com/kubernetes/kompose/blob/main/docs/installation.md#github-release
   kompose:
     <<: *base
@@ -269,7 +282,7 @@ services:
       tags: ['k8s:argo']
       context: . 
       dockerfile_inline: |
-        FROM quay.io/argoproj/argocli:${ARGO_CLI_VERSION:-v3.4.17} as argo
+        FROM quay.io/argoproj/argocli:${ARGO_CLI_VERSION:-v3.4.17} AS argo
         FROM k8s:base 
         COPY --from=argo /bin/argo /bin/argo
     entrypoint: argo 
@@ -284,7 +297,7 @@ services:
       tags: ['k8s:kubefwd']
       context: . 
       dockerfile_inline: |
-        FROM txn2/kubefwd:${KUBEFWD_VERSION:-1.22.5} as builder 
+        FROM txn2/kubefwd:${KUBEFWD_VERSION:-1.22.5} AS builder 
         FROM k8s:base
         COPY --from=builder /kubefwd /usr/bin/kubefwd
     entrypoint: kubefwd
@@ -370,7 +383,7 @@ services:
       tags: ['k8s:rancher']
       context: . 
       dockerfile_inline: |
-        FROM rancher/cli2:${RANCHER_CLI_VERSION:-v2.8.4} as rancher
+        FROM rancher/cli2:${RANCHER_CLI_VERSION:-v2.8.4} AS rancher
         FROM k8s:base 
         COPY --from=rancher /usr/bin/rancher /usr/bin/
     entrypoint: /usr/bin/rancher 
@@ -384,7 +397,7 @@ services:
       tags: ['k8s:promtool']
       context: . 
       dockerfile_inline: |
-        FROM prom/prometheus:${PROMETHEUS_CLI_VERSION:-v2.52.0} as prom
+        FROM prom/prometheus:${PROMETHEUS_CLI_VERSION:-v2.52.0} AS prom
         FROM k8s:base 
         COPY --from=prom /bin/promtool /usr/bin/
         USER ${DOCKER_UGNAME:-root}
@@ -406,7 +419,7 @@ services:
       tags: ['k8s:dind']
       context: . 
       dockerfile_inline: |
-        FROM k8s:base as base
+        FROM k8s:base AS base
         FROM compose.mk:dind_base 
         COPY --from=base \
           /usr/bin/kube* /usr/bin/helm* \
@@ -458,7 +471,7 @@ services:
       tags: ['k8s:tui']
       context: . 
       dockerfile_inline: |
-        FROM k8s:dind as dind_base
+        FROM k8s:dind AS dind_base
         FROM compose.mk:tux
         COPY --from=dind_base \
           /usr/bin/kube* /usr/bin/helm* \
