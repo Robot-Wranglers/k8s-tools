@@ -252,7 +252,7 @@ services:
         FROM k8s:base
         USER root 
         RUN curl -s -Lo fission \
-            https://github.com/fission/fission/releases/download/${FISSION_CLI_VERSION:-v1.20.1}/fission-${FISSION_CLI_VERSION:-v1.20.1}-linux-amd64
+            https://github.com/fission/fission/releases/download/${FISSION_CLI_VERSION:-v1.21.0}/fission-${FISSION_CLI_VERSION:-v1.21.0}-linux-amd64
         RUN chmod +x fission && mv fission /usr/local/bin/
         USER ${DOCKER_UGNAME:-root}
     entrypoint: fission
