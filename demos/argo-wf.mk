@@ -27,17 +27,11 @@
 include k8s.mk
 
 # Cluster details that will be used by k3d.
-export CLUSTER_NAME:=k8s-tools-e2e
+export CLUSTER_NAME:=k8s-tools-argo-wf
 
 # Ensure local KUBECONFIG exists & ignore anything from environment
 export KUBECONFIG:=./fake.profile.yaml
 export _:=$(shell umask 066; touch ${KUBECONFIG})
-
-# Chart & Pod details that we'll use later during deploy
-export HELM_REPO:=https://helm.github.io/examples
-export HELM_CHART:=examples/hello-world
-export POD_NAME?=test-harness
-export POD_NAMESPACE?=default
 
 # Generate target-scaffolding for k8s-tools.yml services
 $(eval $(call compose.import, k8s-tools.yml))
@@ -53,7 +47,7 @@ clean.pre: flux.stage/cluster.clean
 clean cluster.clean teardown: k3d.cluster.delete/$${CLUSTER_NAME}
 create.pre: flux.stage/cluster.create
 create cluster.create: k3d.cluster.get_or_create/$${CLUSTER_NAME}
-wait cluster.wait: k8s.cluster.wait
+wait cluster.wait: k8s.wait
 
 # Local cluster details
 # https://argoproj.github.io/argo-events/quick_start/
@@ -72,7 +66,7 @@ deploy cluster.deploy: \
 	infra.setup
 	
 test.pre: flux.stage/test
-test: infra.test app.test
+test: infra.test k8s.wait app.test
 
 infra.setup: argo.dispatch/.infra.setup cluster.wait
 .infra.setup: k8s.kubens.create/${argo_namespace}
