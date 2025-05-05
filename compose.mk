@@ -1473,7 +1473,7 @@ io.stack.pop=(${io.stack} | ${jq.run} '.[-1]'; ${io.stack} | ${jq.run} '.[1:]' >
 io.stack.require=( ls ${1} >/dev/null 2>/dev/null || echo '[]' > ${1})
 io.log=$(call log.io,${1})
 io.log.part1=$(call log.part1,${GLYPH_IO}${1})
-io.log.part2=$(call log.part2,${GLYPH_IO}${1})
+io.log.part2=$(call log.part2,${1})
 io.stack.push/%:
 	@# Pushes new JSON data onto the named stack-file
 	@#
@@ -4745,7 +4745,7 @@ ${compose_file_stem}.services $(target_namespace).services:
 	@#
 	@# NB: This must remain suitable for use with xargs, etc
 	@#
-	echo $(__services__) | sed -e 's/ /\n/g'
+	echo $(__services__) | sed -e 's/ /\n/g' | sort
 
 ${compose_file_stem}.images ${target_namespace}.images:; ${make} compose.images/${compose_file}
 	@# Returns a nl-delimited list of images for this compose file

@@ -32,38 +32,38 @@ First, how about getting a list of tool containers that are defined?
 ```bash 
 $ ./k8s.mk k8s-tools.services
 k8s
-promtool
-argo
-awscli
-fission
-istioctl
-k9s
-kn
-kubectl_exec
-tui
-helmify
-krew
-kubeconform
-kustomize
-helm
-lazydocker
 dind
 ansible
-aws-iam-authenticator
-helm-unittest
-k3d
-kind
-kubectl
-vals
-cdk
-eksctl
-graph-easy
-helm-diff
-rancher
-kompose
 kubefwd
-kubeseal
+krew
+kubectl_exec
+rancher
 helm-push
+k9s
+kn
+kompose
+vals
+argo
+eksctl
+k3d
+helm-unittest
+helmify
+istioctl
+kubeconform
+lazydocker
+aws-iam-authenticator
+awscli
+helm-diff
+tui
+kubectl
+promtool
+cdk
+fission
+kind
+graph-easy
+kubeseal
+kustomize
+helm
 ```
 
 #### Shells & Task Dispatch
@@ -183,7 +183,7 @@ $ ./k8s.mk jb name=ahoy \
 
 Tidy. We took advantage of a discrete and useful piece of ansible without installing python, or ansible, or getting sucked into a never-ending process of ansibling all the things.
 
-### Blocking And Paralellism
+#### Blocking And Paralellism
 <hr style="width:95%;border-bottom:1px dashed black;">
 
 Since kubernetes is a distributed system, we don't necessarily want to be restricted to sequential activities in our scripts.  There are several ways to go about this, and lots of utilities in the k8s-tools suite will individually default to async and optionally support some kind of `--wait` argument. 
@@ -222,13 +222,6 @@ bootstrap: setup.platform setup.logging setup.monitoring setup.app
 ```
 
 Of course you could do this in pure shell or a variety of other ways.  Preferring a Makefile tends to keep things really organized though, and we retain the ability to execute every piece of it individually, rather than being stuck with some kind of top-to-bottom execution of everything.  Much more advanced stuff is possible by combining make's [native support for parallelism](https://www.gnu.org/software/make/manual/html_node/Parallel.html) and its own [synchronization primitives](https://www.gnu.org/software/make/manual/html_node/Parallel-Disable.html).
-
-#### Istioctl
-<hr style="width:95%;border-bottom:1px dashed black;">
-
-```bash
-$ echo istioctl install --set profile=demo -y | ./k8s.mk istioctl.shell.pipe
-```
 
 
 <hr style="width:100%;border-bottom:3px solid black;">
