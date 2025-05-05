@@ -42,7 +42,7 @@ nav:
     - 'Overview': 'overview.md'
     - 'Quickstart': 'quickstart.md'
     - 'Toolbox & Manifest': 'toolbox.md'
-    - 'Automation': 'k8s.mk.md'
+    - 'Intro to Automation': 'k8s.mk.md'
     # - Features: 'features.md'
     # - Integration: 'integration.md'
   # - Core Components:

@@ -28,6 +28,7 @@ services:
     hostname: k8s-base
     environment: &base_environment
       AWS_PROFILE: ${AWS_PROFILE:-}
+      KUBECONFIG_EXTERNAL: ${KUBECONFIG:-kubeconf.local}
       KUBECONFIG: /home/${DOCKER_UGNAME:-root}/.kube/config
       DOCKER_UID: ${DOCKER_UID:-1000}
       DOCKER_GID: ${DOCKER_GID:-1000}
@@ -59,7 +60,7 @@ services:
         RUN cp /home/${DOCKER_UGNAME:-root}/.krew/bin/* /usr/bin
         RUN chown -R ${DOCKER_UID:-1000}:${DOCKER_GID:-1000} /home/${DOCKER_UGNAME:-root}/
         RUN curl -sL https://raw.githubusercontent.com/holman/spark/master/spark -o /usr/bin/spark && chmod ugo+x /usr/bin/spark
-        RUN apk -q --no-cache add docker
+        RUN apk -q --no-cache add docker docker-compose
         USER ${DOCKER_UGNAME:-root}
         ENV PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/home/${DOCKER_UGNAME:-root}/.krew/bin
     # NB: Left for reference, and possibly required by older versions of docker or certain configurations?  

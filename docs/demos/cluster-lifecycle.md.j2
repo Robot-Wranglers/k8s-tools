@@ -36,17 +36,71 @@ $ ./demos/cluster-lifecycle.mk teardown
 ### End-to-End Output
 <hr style="width:100%;border-bottom:3px solid black;">
 
-The following *(large)* image shows the full output of `./demos/cluster-lifecycle.mk clean create deploy test teardown`.  One particularly interesting feature is the preview of pod/sevice topologies from various namespaces that you can see below.  Topology previews are console-friendly, and work from CI/CD like github-actions, which allows you to **visually parse the results of complex orchestration** very quickly.  At this high level of detail you won't be able tell specifics, but it's very useful for showing whether results have changed.
+The following *(large)* image shows the full output of `./demos/cluster-lifecycle.mk clean create deploy test teardown`.  
+
+One particularly interesting feature is the *graphical preview* of pod/sevice topologies from various namespaces that you can see below.  Topology previews are console-friendly and work from CI/CD like github-actions, which allows you to **visually parse the results of complex orchestration** very quickly.  At this high level of detail you won't be able tell specifics, but it's very useful for showing whether results have changed.
 
 {{macros.img_link("cluster-lifecycle.png", mkdocs, "33%")}}
 
 ### Interactive Workflows
 <hr style="width:100%;border-bottom:3px solid black;">
 
-One aspect of the demo that hasn't been exercised yet by the end-to-end example above is grafana installation.
+An aspect of the demo that hasn't been exercised yet by the end-to-end example above is grafana installation.  You can automate all of this stuff too, but stepping through it is useful to show debugging and prototyping workflows.  So let's do it manually just for fun, then inspect the results using other `k8s.mk` tooling.  
+
+#### Bootstrap
+<hr style="width:95%;border-bottom:1px dashed black;">
+Basic grafana deployment just uses the established entrypoint `deploy.grafana`.  We'll prefix the {{macros.api_link('k8s.wait', mkdocs)}} target to ensure the cluster is ready before starting, which probably isn't needed, but is a good reminder that the [whole internal API]({{mkdocs.site_relative_url}}/api) is automatically available as a CLI.
 
 ```bash 
-$ ./demos/cluster-lifecycle.mk deploy.grafana
+$ ./demos/cluster-lifecycle.mk k8s.wait deploy.grafana
+.. lots of output ..
+```
+See [the source code](#source-code) for the `deploy.grafana` implementation, 
+
+#### Port Forwarding
+<hr style="width:95%;border-bottom:1px dashed black;">
+
+Let's use `kubefwd` to setup port-forwarding.  This is nicer than `kubectl port-forward` in that you should actually get working DNS.  Using [kubefwd via `k8s.mk`]({{mkdocs.site_relative_url}}/api/#api-kubefwd) has the added benefits that it handles aspects of setup/shutdown automatically to make it more idempotent *(note the `docker.stop` stuff at the beginning of the logs below)*.
+
+```bash 
+$ ./demos/cluster-lifecycle.mk fwd.grafana
+④  ≣ docker.stop // kubefwd.k8s-tools.prometheus.grafana 
+④  ≣ docker.stop // No containers found 
+②  ⑆ kubefwd // prometheus // grafana 
+  {
+    "namespace": "prometheus",
+    "svc": "grafana"
+  }
+②  ⑆ kubefwd // container=kubefwd.k8s-tools.prometheus.grafana 
+②  ⑆ kubefwd // cmd=kubefwd svc -n prometheus -f metadata.name=grafana --mapping 80:8081 -v 
+③  ⇄ flux.timeout.sh (3s) // docker logs -f kubefwd.k8s-tools.prometheus.grafana 
+INFO[11:17:29]  _          _           __             _     
+INFO[11:17:29] | | ___   _| |__   ___ / _|_      ____| |    
+INFO[11:17:29] | |/ / | | | '_ \ / _ \ |_\ \ /\ / / _  |    
+INFO[11:17:29] |   <| |_| | |_) |  __/  _|\ V  V / (_| |    
+INFO[11:17:29] |_|\_\\__,_|_.__/ \___|_|   \_/\_/ \__,_|    
+INFO[11:17:29]                                              
+INFO[11:17:29] Version 1.22.5                               
+INFO[11:17:29] https://github.com/txn2/kubefwd              
+INFO[11:17:29]                                              
+INFO[11:17:29] Press [Ctrl-C] to stop forwarding.           
+INFO[11:17:29] 'cat /etc/hosts' to see all host entries.    
+INFO[11:17:29] Loaded hosts file /etc/hosts                 
+INFO[11:17:29] HostFile management: Backing up your original hosts file /etc/hosts to /root/hosts.original 
+INFO[11:17:29] Successfully connected context: k3d-k8s-tools-e2e 
+DEBU[11:17:29] Registry: Start forwarding service grafana.prometheus.k3d-k8s-tools-e2e 
+DEBU[11:17:29] Resolving: grafana to 127.1.27.1 (grafana)   
+INFO[11:17:29] Port-Forward:       127.1.27.1 grafana:8081 to pod grafana-5bfc75d5b4-gwxqs:3000 
+③  ⇄ flux.timeout.sh (3s) // finished 
+①  ⇄ Connect with: http://admin:test@grafana:8081
+```
+<br/>
+
+#### Shelling In 
+<hr style="width:95%;border-bottom:1px dashed black;">
+
+```bash 
+$ cluster.shell
 ```
 
 ### Source Code 

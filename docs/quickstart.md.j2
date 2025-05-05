@@ -1,7 +1,46 @@
 ## Quickstart
 <br/>
 
-### Test Drive
+### Basic Installation
+<hr style="width:100%;border-bottom:3px solid black;">
+
+Basic installation is just copying files and making them executable:
+
+```bash
+$ cd myproject 
+
+# Download compose.mk, k8s.mk, and k8s-tools.yml
+$ curl -sL \
+  https://raw.githubusercontent.com/Robot-Wranglers/k8s-tools/master/compose.mk \
+    > compose.mk
+$ curl -sL \
+  https://raw.githubusercontent.com/Robot-Wranglers/k8s-tools/master/k8s.mk \
+    > k8s.mk
+$ curl -sL \
+  https://raw.githubusercontent.com/Robot-Wranglers/k8s-tools/master/k8s-tools.yml \
+    > k8s-tools.yml
+
+# Make scripts executable
+$ chmod +x compose.mk k8s.mk k8s-tools.yml
+
+# Now equivalent to `make -f compose.mk ...`
+$ ./compose.mk ...
+$ ./k8s.mk ...
+
+# Now equivalent to `docker compose -f k8s-tools.yml ...`
+$ ./k8s-tools.yml ...
+```
+
+### Project Integration
+<hr style="width:100%;border-bottom:3px solid black;">
+
+In your project Makefile:
+
+```Makefile
+include k8s.mk
+```
+
+### For Developers
 <hr style="width:100%;border-bottom:3px solid black;">
 
 ```bash
@@ -17,18 +56,8 @@ $ make build
 # run all the demos 
 $ make demos
 ```
-
 <br/>
 
-### Integration With Your Project
-<hr style="width:100%;border-bottom:3px solid black;">
-
-Placeholder 
-
-### Embedding Tools
-<hr style="width:100%;border-bottom:3px solid black;">
-
-Placeholder 
 
 {#
 You'll probably want to read over the [compose.mk]({{mkdocs.site_relative_url}}/compose.mk) section to really understand what's going on here.  In case you've already seen it though, here's the quick start with the copy/paste stuff.

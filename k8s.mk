@@ -45,19 +45,18 @@ log.k8s=$(call log, ${GLYPH_K8S} ${1})
 # Hints for exactly how k8s.mk is being invoked 
 export K8SMK_STANDALONE?=0
 export K8S_MK_SRC=$(shell echo ${MAKEFILE_LIST} | sed 's/ /\n/g' | grep k8s.mk)
-K8S_TOOLS=`dirname ${K8S_MK_SRC}`/k8s-tools.yml
+K8S_TOOLS=$(shell dirname ${K8S_MK_SRC})/k8s-tools.yml
 ifeq ($(K8SMK_STANDALONE),1)
-include compose.mk
 export K8S_MK_LIB=0
 else
 export K8S_MK_LIB=1
 endif
-
-# Import compose.mk iff we're in stand-alone mode.
+ifeq ($(filter ${MAKEFILE_LIST},compose.mk),)
+include $(shell dirname ${K8S_MK_SRC})/compose.mk
+endif
 ifeq ($(K8SMK_STANDALONE),1)
 $(eval $(call compose.import, ${K8S_TOOLS}))
 endif
-
 # Extra repos that are included in 'docker.images' output.  
 # This is used to differentiate "local" images.
 export CMK_EXTRA_REPO:=k8s
@@ -294,21 +293,105 @@ helm.release.missing/%: ; ${make} flux.negate/helm.release.present/${*}
 
 #░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 ## END: helm.* targets
+## BEGIN: 'kind.* targets
+##
+## The *`kind.*`* targets describe a small interface for working with `kind`[2].  
+##
+## Small utilities that work as pre-req tasks, or help to keep common tasks idempotent.
+##
+## DOCS: 
+##   [1]: https://robot-wranglers.github.io/k8s-tools/api#api-kind
+##   [2]: https://kind.sigs.k8s.io/
+#░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+kind.cluster.list kind.list:; $(call containerized.maybe, kind)
+	@# Returns cluster-names, newline delimited.
+	@#
+	@# USAGE:  
+	@#   ./k8s.mk kind.cluster.list
+	@# 
+.kind.cluster.list .kind.list:
+	kind get clusters | ${stream.indent}
+
+kind.cluster.exists/% kind.has_cluster/%:; $(call containerized.maybe, kind)
+	@# Succeeds iff cluster exists.
+.kind.cluster.exists/% .kind.has_cluster/%:; kind get clusters | grep ${*}
+
+kind.cluster.create/%:; $(call containerized.maybe, kind)
+	@# Creates a kind cluster with the given name, using the given configuration.
+	@# We force a `docker` provider rather than allowing autodetection, but allow 
+	@# autodetection for node-image, which usually has to match the `kind` version
+	@# being used anyway.  Must provide a path to a node-group config file.
+	@#
+	@# See the docs at https://kind.sigs.k8s.io/docs/user/quick-start/#advanced
+	@#
+	@# USAGE:
+	@#     config=<path> ./k8s.mk kind.cluster.create/<cluster_name>
+.kind.cluster.create/%:
+	$(call log.k8s, kind.cluster.create ${sep} ${bold}${*})
+	ls $${config} \
+	|| ( \
+		$(call log.k8s,${red}Config file @ $${config} is missing, cannot continue) \
+		; exit 1 ) 
+	set -x && KIND_EXPERIMENTAL_PROVIDER=docker kind \
+		create cluster  --name ${*} --wait 24h --config $${config}
+kind.cluster.delete/%:; $(call containerized.maybe, kind)
+	@# Idempotent version of kind cluster delete 
+	@#
+	@# USAGE:
+	@#   ./k8s.mk kind.cluster.delete/<cluster_name>
+.kind.cluster.delete/%:
+	$(call log.k8s, ${@} ${sep} Deleting cluster ${sep} ${underline}${*}${no_ansi})
+	(set -x && kind delete cluster --name ${*}) || true
+
+#░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+## END: kind.* targets
 ## BEGIN: 'k3d.* targets
 ##
 ## The *`k3d.*`* targets describe a small interface for working with `k3d`[2].  
 ##
-## Most targets in this namespace will use k3d directly, and so are usually **dispatched**, and not run from the host.  
-## Most targets are small utilities that can help to keep common tasks idempotent, but there's also a TUI that provides a useful overview of what's going on with K3d
+## Mostly just small utilities that can help to keep common tasks idempotent, but
+## there's also a TUI that provides a useful overview of what's going on with K3d
 ##
 ## DOCS: 
-##   [1]: https://robot-wranglers.github.io/k8s-tools/api#api-k3d\
-##   [2]:
+##   [1]: https://robot-wranglers.github.io/k8s-tools/api#api-k3d
+##   [2]: https://k3d.io/
+
 #░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 
 # Geometry for k3d.commander
 GEO_K3D="5b40,111x56,0,0[111x41,0,0{55x41,0,0,1,55x41,56,0[55x16,56,0,2,55x24,56,17,3]},111x14,0,42{55x14,0,42,4,55x14,56,42,5}]"
-io.curl=curl -sSL
+
+k3d.cluster.create/%:
+	@# Creates a k3d cluster with the given name, using the given configuration.
+	@# This supports most of the usual command-line options,
+	@# but they must be passed as variables.
+	@#
+	@# USAGE:
+	@#   k3d_servers=.. k3d_agents=.. 
+	@#   k3d_port=.. k3d_api_port=.. 
+	@#     ./k8s.mk k3d.cluster.create/<cluster_name>
+	@#
+	$(call log.k8s, k3d.cluster.create ${sep} ${bold}${*})
+	export KUBECONFIG=$${KUBECONFIG}.tmp \
+	&& sh -x -c "k3d cluster create ${*} \
+		--servers $${k3d_servers:-3} \
+		--agents $${k3d_agents:-3} \
+		--api-port $${k3d_api_port:-6551} \
+		--volume $${tmp}/:/${*}@all --wait" \
+	&& tmp=`dirname $${KUBECONFIG}`/`basename -s .tmp $${KUBECONFIG}` \
+	&& cat $${KUBECONFIG} > $${tmp} \
+	&& $(call log.k8s, k3d.cluster.create ${sep} syncing ${dim}$${KUBECONFIG}${no_ansi} -> $${KUBECONFIG_EXTERNAL}) \
+	&& cat $${KUBECONFIG} > $${KUBECONFIG_EXTERNAL}
+
+k3d.cluster.delete/%:; $(call containerized.maybe, k3d)
+	@# Idempotent version of k3d cluster delete 
+	@#
+	@# USAGE:
+	@#   ./k8s.mk k3d.cluster.delete/<cluster_name>
+.k3d.cluster.delete/%:
+	$(call log.k8s, ${@} ${sep} Deleting cluster ${sep} ${underline}${*}${no_ansi})
+	(set -x && k3d cluster delete ${*}) || true
+
 k3d.cluster.exists/% k3d.has_cluster/%:; k3d cluster list | grep ${*}
 	@# Succeeds iff cluster exists.
 
@@ -317,35 +400,6 @@ k3d.cluster.get_or_create/%:; $(call containerized.maybe, k3d)
 .k3d.cluster.get_or_create/%:
 	$(call log.k8s, k3d.cluster.get_or_create ${sep} ${bold}${*})
 	${make} flux.do.unless/k3d.cluster.create/${*},k3d.has_cluster/${*}
-
-k3d.cluster.create/%:
-	@# Creates a k3d cluster with the given name, using the given configuration.
-	@# This supports most of the usual command-line options, but they are passed 
-	@# as variables.
-	@#
-	@# USAGE:
-	@#   k3d_servers=.. k3d_agents=.. 
-	@#   k3d_port=.. k3d_api_port=.. 
-	@#     ./k8s.mk k3d.cluster.create/<cluster_name>
-	@#
-	$(call log.k8s, k3d.cluster.create ${sep} ${bold}${*})
-	tmp=`pwd` && set -x \
-	&& k3d cluster create ${*} \
-		--servers $${k3d_servers:-3} \
-		--agents $${k3d_agents:-3} \
-		--api-port $${k3d_api_port:-6551} \
-		--volume $${tmp}/:/${*}@all --wait
-
-# --port "$${k3d_port:-12000:12000@agent:0}" \
-
-k3d.cluster.delete/%:; $(call containerized.maybe, k3d)
-	@# Idempotent version of k3d cluster delete 
-	@#
-	@# USAGE:
-	@#   ./k8s.mk k3d.cluster.delete/<cluster_name>
-.k3d.cluster.delete/%:
-	$(call log.k8s, ${@} ${sep} Deleting cluster ${sep}${underline}${*})
-	(set -x && k3d cluster delete ${*}) || true
 
 k3d.cluster.list k3d.list:; $(call containerized.maybe, k3d)
 	@# Returns cluster-names, newline delimited.
@@ -402,23 +456,11 @@ k3d.panic:
 	$(call log.k8s, ${@} ${sep} Stopping all k3d containers)
 	(${make} k3d.ps || echo -n) | xargs -I% bash -x -c "docker stop -t 1 %"
 
-# k3d.ps:
-# 	@# Container names for everything that is k3d related.
-# 	@#
-# 	@# USAGE:  
-# 	@#   ./k8s.mk k3d.ps
-# 	@# 
-# 	$(call log, ${dim}${GLYPH_K8S} ${@} ${sep}${dim} Listing k3d containers)
-# 	(docker ps --format json \
-# 	| ${jq} -r '.Names' \
-# 	| grep ^k3d- \
-# 	|| printf "${yellow}No containers found.${no_ansi}\n" > ${stderr} ) ${stderr_stdout_indent}
-
 k3d.stat: 
 	@# Show status for k3d.
 	@# 
 	$(call log.k8s, k3d.stat)
-	$(trace_maybe) && ${make} k3d.ps k3d.cluster.list 
+	${make} k3d.ps k3d.cluster.list 
 
 # k3d.stat.widget:
 # 	clear=1 verbose=1 interval=10 ${make} flux.loopf/flux.apply/k3d.stat
@@ -457,16 +499,18 @@ k8s.get/% kubectl.get/%:; $(call containerized.maybe, k8s)
 	&& eval $${cmd_t}
 
 kubectl.apply.stdin:
-	@#
-	@#
-	@#
+	@# Equivalent to `kubectl apply -f -` but additionally implies
+	@# a preview of the applied file, which is sent to stderr.
 	@#
 	$(call log.k8s, ${@} ${sep} ${cyan_flow_left})
 	${stream.stdin} | yq . -o json | ${stream.peek} | kubectl apply -f - 
+
 kubectl.apply.url:; ${io.get.url} && ${make} kubectl.apply/$${tmpf}
+	@# Apply URL.  Rather than handing the URL directly to kubectl, 
+	@# this downloads the file first and applies as usual.
 
 kubectl.apply/%:
-	@# Runs kubectl apply on the given file
+	@# Runs kubectl apply on the given file,
 	@# Also available as a macro.
 	kubectl apply -f ${*} 2> >(grep -v "missing the kubectl.kubernetes.io/last-applied-configuration annotation")
 
@@ -508,10 +552,8 @@ kubectl.namespace.create/%:
 	@#    kubectl.namespace.create/<namespace>
 	@#
 	$(call log.k8s, kubectl.namespace.create ${sep} ${bold}${*} ${sep} )
-	kubectl create namespace ${*} \
-		--dry-run=client -o yaml \
-	| ${stream.peek} | kubectl apply -f - \
-	2>&1
+	kubectl create namespace ${*} --dry-run=client -o yaml \
+	| ${stream.peek} | kubectl apply -f - 2>&1
 
 kubectl.cluster.ready/%:
 	@#
@@ -595,19 +637,6 @@ k8s.graph/%:
 	export scope=`[ "$${namespace}" == "all" ] && echo "--all-namespaces" || echo "-n $${namespace}"` \
 	&& export KUBECTL_NO_STDERR_LOGS=1 \
 	&& kubectl graph $${kind:-pods} $${scope}
-
-# define Dockerfile.convert
-# FROM alpine
-# #RUN apk add -q --update --no-cache coreutils build-base bash procps-ng graphviz imagemagick
-# RUN apk add -q --update --no-cache bash imagemagick
-# endef
-# define Dockerfile.dot
-# FROM alpine
-# #RUN apk add -q --update --no-cache coreutils build-base bash procps-ng graphviz imagemagick
-# RUN apk add -q --update --no-cache bash graphviz
-# ENTRYPOINT dot
-# endef
-# $(eval $(call compose.import.dockerfile.string,Dockerfile.dot))
 
 k8s.graph: k8s.graph/all/pods 
 	@# Alias for k8s.graph/all/pods.  This returns dot-format data.
@@ -1042,7 +1071,10 @@ k9s/%:; cmd="-n ${*}" ${make} k9s
 	@# USAGE:  
 	@#   ./k8s.mk k9s/<namespace>
 
-k9: k9s
+k9s.ui:; tty=0 ${make} k9s
+	@# Preferred entrypoint to start the k9s UI.  This ensures ttys are setup correctly
+
+k9: k9s.ui
 	@# Starts the k9s pod-browser TUI, using whatever namespace is currently activated.
 	@# This is just an alias to cover the frequent typo, and it assumes the 
 	@# `compose.import` macro has already imported k8s-tools services.
