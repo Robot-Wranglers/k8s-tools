@@ -233,6 +233,47 @@ ansible.run/%: .ansible.require
 
 #░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 ## END 'ansible.*' targets
+## BEGIN 'fission.*' targets
+## DOCS: 
+##   [1] https://robot-wranglers.github.io/k8s-tools/api#api-fission
+#░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+fission.env.list:; $(call containerized.maybe, fission)
+	@# Newline-separated list of all the fission environments available.
+.fission.env.list:; fission env list
+fission.stat:; $(call containerized.maybe, fission)
+	@# Describe fission status for the current namespace.
+	@# This only writes to stderr, combining the following
+	@# commands and failing if any one of them fails:
+	@#   fission version
+	@#   fission check
+	@#   fission env list
+	@#   fission function list
+.fission.stat:
+	(  set -x \
+		&& fission version && fission check \
+		&& fission env list && fission function list) \
+	| ${stream.as.log}
+
+fission.assert.env/%:; $(call containerized.maybe, fission)
+	@# Succeeds only when the given environment exists 
+	@# for the currently active namespace.  No output.
+.fission.assert.env/%:;
+	fission env list | awk '{print $$1}' | tail -n+2 | grep ${*} > /dev/null
+
+fission.env.create/%:; $(call containerized.maybe, fission)
+	@# Creates the named fission environment if it doesn't already exist.
+	@# Desired namespace should already be activated and `img` must be 
+	@# set in the environment.
+.fission.env.create/%:
+	$(call io.log.part1, Checking for environment ${*})
+	${make} fission.assert.env/${*} \
+	&& $(call io.log.part2, already exists) \
+	|| ($(call io.log.part2, missing) \
+		; set -x\
+		; fission env create --name ${*} --image $${img};)
+
+#░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+## END 'fission.*' targets
 ## BEGIN 'helm.*' targets
 ## DOCS: 
 ##   [1] https://robot-wranglers.github.io/k8s-tools/api#api-helm
@@ -355,7 +396,6 @@ kind.cluster.delete/%:; $(call containerized.maybe, kind)
 ## DOCS: 
 ##   [1]: https://robot-wranglers.github.io/k8s-tools/api#api-k3d
 ##   [2]: https://k3d.io/
-
 #░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 
 # Geometry for k3d.commander
@@ -503,7 +543,7 @@ kubectl.apply.stdin:
 	@# a preview of the applied file, which is sent to stderr.
 	@#
 	$(call log.k8s, ${@} ${sep} ${cyan_flow_left})
-	${stream.stdin} | yq . -o json | ${stream.peek} | kubectl apply -f - 
+	${stream.stdin} | ${yq} . -o json | ${stream.peek} | kubectl apply -f - 
 
 kubectl.apply.url:; ${io.get.url} && ${make} kubectl.apply/$${tmpf}
 	@# Apply URL.  Rather than handing the URL directly to kubectl, 
@@ -523,26 +563,16 @@ kubectl.namespace.list:
 	kubectl get namespaces -o json \
 	| jq -r '.items[].metadata.name'
 
-kubectl.namespace.purge/%:
-	@# Wipes everything inside the given namespace
-	@#
-	@# USAGE: 
-	@#    kubectl.namespace.purge/<namespace>
-	@#
-	$(call log.k8s, kubectl.namespace.purge ${sep} ${no_ansi}${green}${*} ${sep} Waiting for delete (cascade=foreground))
-	${trace_maybe} \
-	&& kubectl delete namespace --cascade=foreground ${*} -v=9 2>/dev/null || true
-
-kubectl.namespace.purge.by.prefix/%:
+k8s.namespace.purge.by.prefix/%:
 	@# Runs a separate purge for every matching namespace.
 	@# NB: This isn't likely to clean everything, see the docs for your dependencies.
 	@#
 	@# USAGE: 
-	@#    ./k8s.mk kubectl.namespace.purge.by.prefix/<prefix>
+	@#    ./k8s.mk k8s.namespace.purge.by.prefix/<prefix>
 	@#
 	${make} kubectl.namespace.list \
 	| grep ${*} | ${stream.peek} \
-	| xargs -I% bash -x -c "${make} kubectl.namespace.purge/%"
+	| xargs -I% bash -x -c "${make} k8s.namespace.purge/%"
 	|| $(call log.k8s, ${@} ${sep} ${dim}Nothing to purge: no namespaces matching \`${*}*\`)
 
 kubectl.namespace.create/%:
@@ -691,8 +721,16 @@ k8s.graph.tui/%:
 		&& convert /tmp/svg.svg -transparent white -background transparent -flatten png:- 2>/dev/null
 .k8s.graph.tui.clear/%:; clear="--clear" ${make} .k8s.graph.tui/${*}
 
-#░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 
+#░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+## BEGIN: argo.* targets
+##
+## The *`argo.*`* targets describe a small interface for working with the argo 
+## CLI, and holds stuff that might be useful for argo workflows *or* argo events.
+##
+## DOCS: 
+##   [1] https://robot-wranglers.github.io/k8s-tools/api#api-argo
+#░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 argo.list: argo.list/argo 
 	@# List for the default namespace (i.e. "argo")
 
@@ -732,7 +770,7 @@ k8s.help:; ${make} mk.namespace.filter/k8s.
 k8s.kubens/%: 
 	@# Context-manager.  Activates the given namespace.
 	@# NB: This modifies state in the kubeconfig, so that it can effect contexts 
-	@# outside of the current process, therefore this is not thread-safe.
+	@# outside of the current process, and therefore this is not thread-safe.
 	@#
 	@# USAGE:  
 	@#   ./k8s.mk k8s.kubens/<namespace>
@@ -773,6 +811,16 @@ k8s.namespace.label/%:
 	; printf "$${ns}"; printf '", "definition": {"metadata": {"labels": {' \
 	; printf "\"$${key}\": \"$${val}\"}}}}") | ${jq} . \
 	| ${make} k8s.ansible
+
+k8s.namespace.purge/%:; $(call containerized.maybe, kubectl)
+	@# Wipes everything inside the given namespace.
+	@#
+	@# USAGE: 
+	@#    k8s.namespace.purge/<namespace>
+.k8s.namespace.purge/%:
+	$(call log.k8s, k8s.namespace.purge ${sep} ${no_ansi}${green}${*} ${sep} Waiting for delete (cascade=foreground))
+	${trace_maybe} \
+	&& kubectl delete namespace --cascade=foreground ${*} -v=9 2>/dev/null || true
 
 k8s.namespace.wait/%:; $(call containerized.maybe, k8s)
 	@# Waits for every pod in the given namespace to be ready.
@@ -1043,7 +1091,7 @@ kubefwd.start/% k8s.namespace.fwd/%:
 ## END 'kubefwd.*' targets
 ## BEGIN Misc targets
 ## DOCS: 
-##   [1] https://robot-wranglers.github.io/k8s-tools/api#api-k8smk
+##   [1] https://robot-wranglers.github.io/k8s-tools/api
 #░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 
 ktop: ktop/all
