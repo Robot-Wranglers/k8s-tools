@@ -1,5 +1,5 @@
 #!/usr/bin/env -S K8SMK_STANDALONE=1 make -f
-#░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+#░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 # k8s.mk: 
 #   Automation library/framework/tool building on compose.mk and k8s-tools.yml
 #
@@ -9,15 +9,13 @@
 #
 # FEATURES:
 #   1) ....................................................
-#   2) Stand-alone mode also available, i.e. a tool that requires no Makefile and no compose file.
-#   3) ....................................................
-#   4) A small-but-powerful built-in TUI framework with no host dependencies. (See the tui.* API) 
+#   1) ....................................................
+#   1) ....................................................
+#   1) ....................................................
 #
 # USAGE: ( For Integration )
 #   # Add this to your project Makefile
 #   include k8s.mk
-#   include compose.mk
-#   $(eval $(call compose.import, ▰, TRUE, k8s-tools.yml))
 #   demo: ▰/k8s/self.demo
 #   self.demo:
 #       kubectl --help
@@ -27,39 +25,58 @@
 #   ./k8s.mk help
 #
 # APOLOGIES:
-#   In advance if you're checking out the implementation.  This is unavoidably gnarly in a lot of places.
-#   No one likes a file this long, and especially make-macros are not the most fun stuff to read or write.
-#   Breaking this apart could make internal development easier but would complicate boilerplate required
-#   for integration with external projects.  Pull requests are welcome! =P  
+#   In advance if you're checking out the implementation.  This is just 
+#   unavoidably gnarly in a lot of places.  No one likes a file this long,
+#   and especially make-macros are not the most fun stuff to read or write.
+#   Breaking this apart could make internal development easier but would 
+#   complicate boilerplate required for integration with external projects.  
+#   Pull requests are welcome! =P  
 #
-# HINTS:
-#   1) The goal is that the implementation is well tested, nearly frozen, and generally safe to ignore!
-#   2) If you just want API or other docs, see https://robot-wranglers.github.io/k8s-tools#compose.mk
-#   3) If you need to work on this file, you want Makefile syntax-highlighting & tab/spaces visualization.
+# REFS:
+#   `[1]`: https://robot-wranglers.github.io/k8s-tools
 #
-#░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
-
+#░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+ifndef GLYPH_K8S
 GLYPH_K8S=${green}⑆${dim}
 log.k8s=$(call log, ${GLYPH_K8S} ${1})
+k8s.log=${log.k8s}
+k8s.log.part1=$(call log.part1,${GLYPH_K8S}${1})
+k8s.log.part2=$(call log.part2,${1})
 
 # Hints for exactly how k8s.mk is being invoked 
 export K8SMK_STANDALONE?=0
-export K8S_MK_SRC=$(shell echo ${MAKEFILE_LIST} | sed 's/ /\n/g' | grep k8s.mk)
-K8S_TOOLS=$(shell dirname ${K8S_MK_SRC})/k8s-tools.yml
+export K8S_MK_SRC=k8s.mk
+export TRACE?=$(shell echo "$${TRACE:-$${trace:-0}}")
+
+K8S_TOOLS=$(shell dirname ${K8S_MK_SRC} || echo .)/k8s-tools.yml
 ifeq ($(K8SMK_STANDALONE),1)
 export K8S_MK_LIB=0
 else
 export K8S_MK_LIB=1
 endif
+
+ifeq ($(strip $(if $(filter undefined,$(origin CMK_SRC)),,$(CMK_SRC))),)
+endif
 ifeq ($(filter ${MAKEFILE_LIST},compose.mk),)
-include $(shell dirname ${K8S_MK_SRC})/compose.mk
+include compose.mk
 endif
 ifeq ($(K8SMK_STANDALONE),1)
-$(eval $(call compose.import, ${K8S_TOOLS}))
+#$(shell >&2 echo "stand-alone mode; importing tools containers froms k8s-tools.yml")
+$(call compose.import, file=${K8S_TOOLS})
+#$(shell >&2 echo "done importing k8s-tools")
 endif
+ifeq ($${CMK_SRC:-},)
+endif
+
+ifeq (${TRACE},1)
+$(shell printf "trace=$${TRACE} quiet=$${quiet} verbose=$${verbose:-} ${yellow}CMK_SRC=$${CMK_SRC:-} __interpreter__=$${__interpreter__:-} CMK_INTERPRETING=$${CMK_INTERPRETING:-}${no_ansi}\n" > /dev/stderr)
+endif 
+
 # Extra repos that are included in 'docker.images' output.  
-# This is used to differentiate "local" images.
+# This is used by `compose.mk` to differentiate "local" images.
 export CMK_EXTRA_REPO:=k8s
+
+DEFAULT_KUBECONFIG:=./local.cluster.yml
 
 # How long to wait when checking if namespaces/pods are ready
 export K8S_POLL_DELTA?=23
@@ -70,6 +87,35 @@ export K8S_POLL_DELTA?=23
 # is providing or it can lead to confusion.
 export IMG_ALPINE_K8S?=alpine/k8s:1.30.0
 
+# Ignore any kubeconfig in an environment and start fresh 
+define K8S_PROJECT_LOCAL_CLUSTER
+$(eval export KUBECONFIG:=${DEFAULT_KUBECONFIG})
+$(eval $$(shell umask 066; touch ${KUBECONFIG}))
+endef
+
+k8s.scaffold.cluster=$(eval $(call _k8s.scaffold.cluster, ${1}))
+define _k8s.scaffold.cluster
+ifeq ($${CMK_INTERNAL},1)
+$(call log.import.2,skipping (CMK_INTERNAL=1))
+else
+endif
+# Tolerate non-existent kubeconfigs and 
+# try to ensure containerized tools can use it
+$(call mk.unpack.kwargs, ${1}, template, scaffold_cluster_default)
+$(call mk.unpack.kwargs, ${1}, name, scaffold_cluster_default)
+$(eval export cluster_args:=$$(shell $${jb} $(strip ${1}) | $${jq} -r .args \
+	|| echo "$(if $(filter undefined,$(origin ${kwargs_template}.args)),"",${${kwargs_template}.args})"))
+
+${kwargs_template}.args:=${cluster_args}
+clean: stage/cluster.clean ${kwargs_template}.delete/${kwargs_name}
+create: stage/cluster.create ${kwargs_template}.get_or_create/${kwargs_name}
+endef
+
+k8s.scaffold.minikube=$(call k8s.scaffold.cluster, template=minikube ${1})
+k8s.scaffold.kind=$(call k8s.scaffold.cluster, template=kind ${1})
+k8s.scaffold.k3d=$(call k8s.scaffold.cluster, template=k3d ${1})
+
+
 # This reroutes target invocation to a container if necessary, or otherwise 
 # executes the target directly.  See the usage example for more info.
 #
@@ -77,19 +123,30 @@ export IMG_ALPINE_K8S?=alpine/k8s:1.30.0
 #   foo:; $(call containerized.maybe, container_name)
 #   .foo:; echo hello-world
 .vars.k3d=${io.env}/k3d|awk -F'=' '{print $$1}'|${stream.nl.to.comma}
+.vars.minikube=${io.env}/minikube|awk -F'=' '{print $$1}'|${stream.nl.to.comma}
 define containerized.maybe
-case $${CMK_INTERNAL} in \
-	0)  ${log.target.rerouting} \
+_hdr="${dim}${_GLYPH_IO}${dim} $(shell echo ${@}|sed 's/\/.*//') ${sep}${dim}"\
+&& case $${CMK_INTERNAL} in \
+	0)  $(call log, $${_hdr} Invoked from top; rerouting to tool-container) \
 		; ${trace_maybe} \
-		; env="$(strip $(subst ${space},${comma},$(if $(filter undefined,$(origin 2)),,$(2))) )`${.vars.k3d}`" \
-			quiet=1 ${make} \
-				$(strip ${1}).dispatch/.$(strip ${@});; \
+		; env="$(strip $(subst ${space},${comma},$(if $(filter undefined,$(origin 2)),,$(2))) )`${.vars.k3d}``${.vars.minikube}`" \
+		&& quiet=1 \
+		&& _disp=$(strip ${1}).dispatch \
+		&& _priv=.$(strip ${@}) \
+		&& ([ -z "$${env}" ] && $(call log.trace, $${_hdr} no environment passed) || $(call log.trace, $${_hdr} ${bold}env ${sep} ${green_flow_left}$${env})) \
+		&& $(call log, $${_hdr} ${cyan_flow_right}${ital}$${_disp}/$${_priv}) \
+		&& ${make} $${_disp}/$${_priv};; \
 	*) ${make} .$(strip ${@}) ;; \
 esac
 endef
 
+k8s-tools.versions: compose.versions/k8s-tools.yml
+k8s-tools.versions.table: compose.versions_table/k8s-tools.yml
+
+k8s-tools.versions.show:; ${make} k8s-tools.versions.table | ${stream.glow}
+	@#
+
 #░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
-## END Data & Macros
 ## BEGIN 'ansible.*' targets
 ## DOCS: 
 ##   [1] https://robot-wranglers.github.io/k8s-tools/api#api-ansible
@@ -136,7 +193,7 @@ ansible.adhoc/%:
 	esac
 
 ansible.blockinfile: ansible.adhoc/blockinfile
-	@# Interface for ansible's block-in-file module[1].
+	@# Interface for the ansible  block-in-file module[1].
 	@# This accepts only module args, but there are several ways to pass them.  
 	@# See the docs in ansible.adhoc/<module> for discussion of examples.
 	@#
@@ -151,7 +208,7 @@ ansible.blockinfile: ansible.adhoc/blockinfile
 	@# * `[1]`: https://docs.ansible.com/ansible/latest/collections/ansible/builtin/blockinfile_module.html
     
 ansible.helm: ansible.adhoc/kubernetes.core.helm
-	@# Interface for ansible's helm module[1].
+	@# Interface for the ansible  helm module[1].
 	@# This accepts only module args, but there are a few ways to pass them.  
 	@# See the docs in 'ansible.adhoc/<module>' for discussion of examples.
 	@#
@@ -159,13 +216,12 @@ ansible.helm: ansible.adhoc/kubernetes.core.helm
 	@#
 
 ansible.kubernetes.core.k8s k8s.ansible: ansible.adhoc/kubernetes.core.k8s
-	@# Interface for ansible's `kubernetes.core.k8s` module[1].
+	@# Interface for the ansible  `kubernetes.core.k8s` module[1].
 	@# This accepts only module args, but there are a few ways to pass them.  
 	@# See the docs in 'ansible.adhoc/<module>' for discussion of examples.
 	@#
 	@# * `[1]`: https://docs.ansible.com/ansible/latest/collections/kubernetes/core/k8s_module.html
 	@#
-
 .ansible.gen.playbook/%:
 	@# Generates a (JSON) playbook object for the given module with the given data.
 	@# Optionally takes JSON input, and always produces JSON output.  
@@ -200,7 +256,31 @@ ansible.kubernetes.core.k8s k8s.ansible: ansible.adhoc/kubernetes.core.k8s
 		&& ([ -p ${stdin} ] && (cat ${stdin}||exit 1) || ${jb} $${data}) \
 		| sh -c "jq -c $${filter}"
 
-ansible.run: 
+ansible.run.tasks:
+	@# Runs ansible tasks defined by stdin.
+	# $(call log.docker, ansible.run.tasks ${sep} ${*}) 
+	(${mk.def.read}/ansible.run.tasks.yml \
+	&& ${stream.stdin} | ${stream.indent}) \
+	| ${make} ansible.run
+define ansible.run.tasks.yml
+- name: "k8s.mk / ansible.run.tasks"
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+endef
+
+ansible_tasks= ${trace_maybe} && ansible_args="$(if $(filter undefined,$(origin 1)),,$(1))" ${make} ansible.run.def/${@}
+
+ansible.run.def/%:
+	@# Like `ansible.run.tasks`, but reads content from given define-block
+	@#
+	$(call log.k8s, ansible.run.def ${sep} ${*}) 
+	${mk.def.read}/${*} | ${stream.peek} | ${make} ansible.run.tasks
+	$(call log.k8s, ${@} ${sep} finished)
+
+
+ansible.run: tux.require
 	@# Runs the input-stream as an ansible playbook.
 	@# This calls ansible in a way that ensures all output is JSON.
 	@#
@@ -210,6 +290,8 @@ ansible.run:
 	$(call io.mktemp) \
 	&& ${stream.stdin} > $${tmpf} \
 	&& ${make} flux.timer/ansible.run/$${tmpf}
+# jq.flatten=${jq '[paths(scalars) as $p | {($p | last | tostring): getpath($p)}] | add'
+
 
 ansible.run/%: .ansible.require
 	@# Runs the given playbook file.
@@ -219,7 +301,7 @@ ansible.run/%: .ansible.require
 	@#   ./k8s.mk ansible.run/<path>
 	@#
 	${trace_maybe} \
-	&& ansible_args="-eansible_python_interpreter=\`which python3\`" \
+	&& ansible_args="$${ansible_args:-} -eansible_python_interpreter=\`which python3\`" \
 	&& ansible_args="$${ansible_args} -i localhost, --connection local" \
 	&& src="export ANSIBLE_STDOUT_CALLBACK=json && ansible-playbook $${ansible_args} ${*} " \
 	&& header="ansible.run ${sep} ${*}" \
@@ -237,38 +319,45 @@ ansible.run/%: .ansible.require
 	@# Alias for 'tux.require'.  We actually just want the dind-base to 
 	@# be ready, but this is the simplest way to ensure the bootstrap's 
 	@# done.  NB: This is potentially very slow if nothing is cached.
+
 #░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 ## BEGIN: argo.* targets
 ##
-## The *`argo.*`* targets describe a small interface for working with the argo 
-## CLI, and holds stuff that might be useful for argo workflows *or* argo events.
+## The *`argo.*`* targets describe a small interface for both argo-workflows and argo-events.
 ##
 ## DOCS: 
 ##   [1] https://robot-wranglers.github.io/k8s-tools/api#api-argo
 #░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+
 argo.list: argo.list/argo 
 	@# List for the default namespace (i.e. "argo")
 
-argo.list/%:; argo -n ${*} list 
+argo.list/%:; $(call containerized.maybe, argo)
 	@# Returns the results of 'argo list' for the current argo context.
+.argo.list/%:; argo -n ${*} list 
 
 argo.submit.url:
+	@# USAGE:
+	@#  url="http://../manifest.yml" ./k8s.mk argo.submit.url
 	$(call log.k8s, ${@} ${sep} ${cyan_flow_left})
 	${io.get.url} && cat $${tmpf} | ${make} argo.submit.stdin
 
 argo.submit.stdin=${make} argo.submit.stdin 
-argo.submit.stdin stream.argo.submit :
-	@#
-	@#
-	@#
+argo.submit.stdin:; $(call containerized.maybe, argo)
+	@# USAGE:
+	@#  cat manifest.yml | k8s.mk argo.submit.stdin
+.argo.submit.stdin:
 	$(call log.k8s, ${@} ${sep} ${cyan_flow_left})
 	${stream.peek} | ${make} argo.submit/-
 
-argo.submit/%:
-	@#
-	@#
-	@#
-	$(call log.k8s, ${@} ${sep} ${cyan_flow_left})
+argo.submit/%:; $(call containerized.maybe, argo)
+	@# Pass the given path to `argo submit`.
+	@# This fills in CLI args for `--wait` and `--log` based 
+	@# on whether corresponding environment variables are set.
+	@# USAGE:
+	@#  ./k8s.mk argo.submit/manifest.yml 
+.argo.submit/%:
+	$(call log.k8s, argo.submit ${sep} ${cyan_flow_left})
 	log="--log" \
 	&& wait=`[ -z $${wait:-} ] && true || echo "--wait"` \
 	&& case ${*} in \
@@ -283,6 +372,25 @@ argo.submit/%:
 ##   [1] https://robot-wranglers.github.io/k8s-tools/api#api-fission
 #░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 
+
+_fission.function.assert=\
+	fission function list | tail +2 | cut -d' ' -f1 | grep ${1} > /dev/null
+fission.function.create/%:; $(call containerized.maybe, fission, fission_code fission_env)
+	@# USAGE:
+	@#   fission_env=<env_name> 
+	@#     fission_code=<path> ./k8s.mk 
+	@#      fission.function.create/<fxn_name>
+.fission.function.create/%: mk.assert.env/fission_env mk.assert.env/fission_code
+	$(call io.log.part1, fission.function.create ${sep} Checking for function @ ${*}) \
+	&& ( \
+		 $(call _fission.function.assert,${*}) \
+		 && $(call io.log.part2, ${dim_green}ok) \
+		 || ($(call io.log.part2, ${ital}not created yet) \
+			&& set -x \
+			&& fission function create --name ${*} \
+				--env $${fission_env} --code $${fission_code}) )
+
+
 fission.env.list:; $(call containerized.maybe, fission)
 	@# Newline-separated list of all the fission environments available.
 .fission.env.list:; fission env list
@@ -290,33 +398,118 @@ fission.stat:; $(call containerized.maybe, fission)
 	@# Describe fission status for the current namespace.
 	@# This only writes to stderr, combining the following
 	@# commands and failing if any one of them fails:
-	@#   fission version
 	@#   fission check
 	@#   fission env list
 	@#   fission function list
-.fission.stat:
+.fission.stat: 
+	CMK_INTERNAL=1 ${make} .fission.version | ${stream.as.log}
+	$(call log.k8s,fission.stat)
 	(  set -x \
-		&& fission version && fission check \
+		&& fission check \
 		&& fission env list && fission function list) \
 	| ${stream.as.log}
+.fission.version: 
+	$(call log.k8s,fission.version)
+	fission version | ${yq} -o json
 
 fission.assert.env/%:; $(call containerized.maybe, fission)
 	@# Succeeds only when the given environment exists 
 	@# for the currently active namespace.  No output.
 .fission.assert.env/%:;
-	fission env list | awk '{print $$1}' | tail -n+2 | grep ${*} > /dev/null
+	fission env list \
+		| awk '{print $$1}' \
+		| tail -n+2 | grep ${*} 2> /dev/null >/dev/null
 
-fission.env.create/%:; $(call containerized.maybe, fission)
+fission.env.create/%:; $(call containerized.maybe, fission,img)
 	@# Creates the named fission environment if it doesn't already exist.
 	@# Desired namespace should already be activated and `img` must be 
 	@# set in the environment.
-.fission.env.create/%:
-	$(call io.log.part1, Checking for environment ${*})
+.fission.env.create/%: mk.assert.env/img
+	$(call io.log.part1, ${GLYPH_K8S} ${sep} fission.env.create ${sep} ${dim}Checking for environment ${bold}${*})
 	${make} fission.assert.env/${*} \
-	&& $(call io.log.part2, already exists) \
-	|| ($(call io.log.part2, missing) \
-		; set -x\
-		; fission env create --name ${*} --image $${img};)
+	&& $(call io.log.part2, ${no_ansi_dim}already exists) \
+	|| ( $(call io.log.part2, ${no_ansi}${yellow}not created yet) \
+		&& set -x \
+		&& fission env create --name ${*} --image $${img} )
+
+#░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+## BEGIN 'terraform.*' targets
+## DOCS: 
+##   [1] https://robot-wranglers.github.io/k8s-tools/api#api-terraform
+#░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+terraform_tasks= ${trace_maybe} && terraform_args="$(if $(filter undefined,$(origin 1)),,$(1))" ${make} terraform.run.def/${@}
+terraform.run.def/%:
+	@# Runs the given define-block as terraform code.
+	$(call log.k8s, terraform.run.def ${sep} ${dim_cyan}${*}) 
+	${mk.def.read}/${*} | ${make} terraform.run
+
+terraform.run:
+	@# Runs the input-stream as terraform.
+	@#
+	@# USAGE:
+	@#   cat <playbook> | ./compose.mk ansible.run
+	@#
+	suffix=.tf && $(call io.mktemp) \
+	&& ${stream.stdin} > $${tmpf} \
+	&& ${make} flux.timer/terraform.run/$${tmpf}
+
+terraform.run/%:; $(call containerized.maybe, terraform) 
+.terraform.run/%:
+	@# Runs the given terraform file.
+	@# This creates a temporary directory, and *only* uses the given file.
+	${io.mktempd} \
+	&& $(call log.k8s, terraform.run ${sep} ${dim}file=${*}) \
+	&& cp -rfv ${*} $${tmpd}/main.tf \
+	&& ${make} .terraform.run.directory/$${tmpd}
+
+# terraform.run.directory/%:; $(call containerized.maybe, terraform) 
+.terraform.run.directory/%:
+	@# Runs the given terraform directory (entering it first)
+	$(call log.k8s, terraform.run.directory ${sep} ${dim}dir=${*}) \
+	&& cd $${tmpd} \
+	&& cat *.tf | ${stream.as.log} \
+	&& export ZZTF_VAR_KUBECONFIG=$${KUBECONFIG} \
+	&& ( terraform init \
+		&& terraform apply -auto-approve \
+		&& terraform output ) \
+	; cd ..
+
+#░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+## BEGIN 'kind.*' targets
+## DOCS: 
+##   [1] https://robot-wranglers.github.io/k8s-tools/api#api-minikube
+#░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+
+kind.args?=--wait 0s
+kind.cluster.get_or_create/% kind.get_or_create/%:; $(call containerized.maybe, kind)
+	@# Create a kind cluster if it does not already exist.
+.kind.cluster.get_or_create/% .kind.get_or_create/%:
+	$(call log.k8s, kind.cluster.get_or_create ${sep} ${bold}${*})
+	${make} flux.do.unless/kind.cluster.create/${*},kind.has_cluster/${*} \
+		flux.loop.until/k8s.cluster.ready
+kind.delete/% kind.cluster.delete/%:; $(call containerized.maybe, kind)
+	@# Deletes the named kind cluster 
+.kind.delete/% .kind.cluster.delete/%:
+	$(call log.k8s, kind.delete ${sep} ${bold}${*})
+	set -x && kind delete cluster --name ${*} #&> /dev/stdout | ${stream.as.log}
+
+kind.has_cluster/%:; $(call containerized.maybe, kind)
+	@# Fails unless the given cluster name exists
+.kind.has_cluster/%: 
+	${make} kind.cluster.list | grep -w ${*} >/dev/null 2>/dev/null
+kind.list kind.cluster.list:; $(call containerized.maybe, kind)
+	@# Show all known kind clusters
+.kind.list .kind.cluster.list:
+	data=`kind get clusters` \
+	&& echo $${data}
+kind.cluster.create/%:; $(call containerized.maybe, kind)
+	@# Creates the given cluster unconditionally
+.kind.cluster.create/%: io.mkdir/$${MINIKUBE_HOME}
+	$(call log.k8s,kind.cluster.create ${sep} ${bold} ${*})
+	( set -x \
+		&& kind create cluster --name ${*} ${kind.args} $${kind_extra:-} \
+			&> /dev/stdout ) \
+	| ${stream.as.log}
 
 #░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 ## BEGIN 'minikube.*' targets
@@ -324,27 +517,62 @@ fission.env.create/%:; $(call containerized.maybe, fission)
 ##   [1] https://robot-wranglers.github.io/k8s-tools/api#api-minikube
 #░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 
-k8s.log.part1=$(call log.part1,${GLYPH_K8S}${1})
-k8s.log.part2=$(call log.part2,${1})
+minikube.args=
+minikube.addons=
+minikube.docker_env/%:; $(call containerized.maybe, minikube)
+	@# Returns JSON equivalent of `minikube docker-env` output for the given profile.
+.minikube.docker_env/%:; 
+	minikube -p ${*} docker-env -o json
 
-minikube.stat/%: mk.require.tool/minikube
-	minikube status -p ${*} -o json | ${stream.as.log}
-minikube.cluster.delete/%:; minikube delete -p ${*}
-minikube.cluster.get_or_create/%:
+minikube.cluster.create/%:; $(call containerized.maybe, minikube)
+	@# Creates the given cluster unconditionally
+.minikube.cluster.create/%: io.mkdir/$${MINIKUBE_HOME}
+	$(call log.k8s,minikube.cluster.create ${sep} ${bold} ${*})
+	( set -x \
+		&& minikube start -p ${*} ${minikube.args} $${minikube_extra:-} \
+			&> /dev/stdout ) \
+	| ${stream.as.log} \
+	&& printf "${minikube.addons}" \
+		| ${stream.comma.to.space} | ${stream.space.to.nl} \
+		| xargs -I% sh -x -c "minikube -p ${*} addons enable %"
+
+minikube.cluster.get_or_create/% minikube.get_or_create/%:; $(call containerized.maybe, minikube)
 	@# Create a minikube cluster if it does not already exist.
+.minikube.cluster.get_or_create/% .minikube.get_or_create/%:
 	$(call log.k8s, minikube.cluster.get_or_create ${sep} ${bold}${*})
-	${make} flux.do.unless/minikube.cluster.create/${*},minikube.has_cluster/${*}
-minikube.has_cluster/%:; ${make} minikube.cluster.list | grep -w ${*} >/dev/null 2>/dev/null
-minikube.cluster.create/%:; minikube start -p ${*}
+	${make} flux.do.unless/minikube.cluster.create/${*},minikube.has_cluster/${*} \
+		flux.loop.until/k8s.cluster.ready
 
-minikube.cluster.list:
-	minikube profile list -o json | ${jq} -r '.invalid[].Name'
-	minikube profile list -o json | ${jq} -r '.valid[].Name'
+minikube.enable_registry/%:; $(call containerized.maybe, minikube)
+	@# Enable minikube's internal registry for the given profile
+.minikube.enable_registry/%:
+	set -x \
+	; minikube addons -p ${*} enable registry \
+	; minikube service -p ${*} registry --url
+minikube.delete/% minikube.cluster.delete/%:; $(call containerized.maybe, minikube)
+	@# Deletes the named minikube cluster 
+.minikube.delete/% .minikube.cluster.delete/%: io.mkdir/$${MINIKUBE_HOME}
+	$(call log.k8s, minikube.delete ${sep} ${bold}${*})
+	minikube delete -p ${*} &> /dev/stdout | ${stream.as.log}
 
-minikube.purge:
+
+minikube.has_cluster/%:; $(call containerized.maybe, minikube)
+	@# Fails unless the given cluster name exists
+.minikube.has_cluster/%: 
+	${make} minikube.cluster.list | grep -w ${*} >/dev/null 2>/dev/null
+
+minikube.list minikube.cluster.list:; $(call containerized.maybe, minikube)
+	@# Show all known minikube clusters
+.minikube.list .minikube.cluster.list:
+	data=`minikube profile list -o json||echo {}` \
+	&& echo $${data} | ${jq} -r '.invalid[].Name' || true \
+	&& echo $${data} | ${jq} -r  '.valid[].Name' || true
+
+minikube.purge:; $(call containerized.maybe, minikube)
+	@# Purges all known minikube clusters
+.minikube.purge:
 	${make} minikube.cluster.list | xargs -I% sh -x -c "minikube delete -p %"
 
-# minikube.start:; minikube start --driver=docker
 minikube.require minikube.running: mk.require.tool/minikube
 	@#
 	hdr="${@} ${sep}${dim}" \
@@ -368,22 +596,18 @@ minikube.require minikube.running: mk.require.tool/minikube
 		&& $(call k8s.log.part2, $${ok}) \
 		|| ($(call k8s.log.part2, ${red}failed); exit 37))
 
+minikube.stat:; $(call containerized.maybe, minikube)
+	@# Show status for minikube itself and all known clusters
+.minikube.stat: mk.require.tool/minikube
+	${make} minikube.cluster.list | ${make} flux.each/minikube.stat
+
+
 #░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 ## BEGIN 'helm.*' targets
 ## DOCS: 
 ##   [1] https://robot-wranglers.github.io/k8s-tools/api#api-helm
 #░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 
-# helm.chart.install:
-# 	@#
-# 	@#
-# 	$(call log.part1, $${header} ) \
-# 	&& ${make} helm.release.stat/$${name} 2>/dev/null \
-# 	; case $$? in \
-# 		0) ($(call log.part2, ${dim_green}ok); ${make} helm.release.status/$${name} );; \
-# 		*) ($(call log.part2, ${dim_ital}missing) \
-# 			&& ${trace_maybe} && helm install $${name} $${chart_ref} -o json | jq .info);; \
-# 	esac
 helm.repo.list: helm.dispatch/.helm.repo.list
 	@# Returns JSON for the currently available helm repositories.
 .helm.repo.list:; helm repo list -o json
@@ -398,61 +622,6 @@ helm.list:; $(call containerized.maybe, k8s)
 .helm.list:; ${helm.list}
 	@# Output of `helm list -A -o json`.
 	@# Also available as a macro.
-
-#░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
-## BEGIN: 'kind.* targets
-##
-## The *`kind.*`* targets describe a small interface for working with `kind`[1],
-## which is a tool for working with kubernetes clusters that use docker containers 
-## as nodes.  See the main API docs at [2]
-##
-## DOCS: 
-##   [1]: https://kind.sigs.k8s.io/
-##   [2]: https://robot-wranglers.github.io/k8s-tools/api#api-kind
-#░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
-kind.purge:; $(call containerized.maybe, kind)
-.kind.purge:
-	set -x && kind delete clusters `kind get clusters|${stream.nl.to.space}`
-
-kind.cluster.list kind.list:; $(call containerized.maybe, kind)
-	@# Returns cluster-names, newline delimited.
-	@#
-	@# USAGE:  
-	@#   ./k8s.mk kind.cluster.list
-	@# 
-.kind.cluster.list .kind.list:; kind get clusters
-
-kind.cluster.exists/% kind.has_cluster/%:; $(call containerized.maybe, kind)
-	@# Succeeds iff cluster exists.
-.kind.cluster.exists/% .kind.has_cluster/%:; kind get clusters | grep ${*}
-
-kind.cluster.create/%:; $(call containerized.maybe, kind)
-	@# Creates a kind cluster with the given name, using the given configuration.
-	@# We force a `docker` provider rather than allowing autodetection, but allow 
-	@# autodetection for node-image, which usually has to match the `kind` version
-	@# being used anyway.  Must provide a path to a node-group config file.
-	@#
-	@# See the docs at https://kind.sigs.k8s.io/docs/user/quick-start/#advanced
-	@#
-	@# USAGE:
-	@#     config=<path> ./k8s.mk kind.cluster.create/<cluster_name>
-.kind.cluster.create/%:
-	$(call log.k8s, kind.cluster.create ${sep} ${bold}${*})
-	ls $${kind_config} \
-	|| ( \
-		$(call log.k8s,${red}Config file @ $${config} is missing, cannot continue) \
-		; exit 1 ) 
-	set -x \
-	&& kind create cluster \
-			--name ${*} --wait 24h --config $${kind_config}
-kind.cluster.delete/%:; $(call containerized.maybe, kind)
-	@# Idempotent version of kind cluster delete 
-	@#
-	@# USAGE:
-	@#   ./k8s.mk kind.cluster.delete/<cluster_name>
-.kind.cluster.delete/%:
-	$(call log.k8s, ${@} ${sep} Deleting cluster ${sep} ${underline}${*}${no_ansi})
-	(set -x && kind delete cluster --name ${*}) || true
 
 #░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 ## BEGIN: 'k3d.* targets
@@ -526,8 +695,11 @@ k3d.cluster.delete/%:; $(call containerized.maybe, k3d)
 	$(call log.k8s, ${@} ${sep} Deleting cluster ${sep} ${underline}${*}${no_ansi})
 	(set -x && k3d cluster delete ${*}) || true
 
-k3d.cluster.exists/% k3d.has_cluster/%:; k3d cluster list | grep ${*}
+k3d.cluster.exists/% k3d.has_cluster/%:; $(call containerized.maybe, k3d)
 	@# Succeeds iff cluster exists.
+.k3d.cluster.exists/% .k3d.has_cluster/%:
+	${k3d.cluster.list} | grep -E '(^| )${*}( |$$)'
+
 
 k3d.cluster.get_or_create/%:; $(call containerized.maybe, k3d)
 	@# Create a k3d cluster if it does not already exist.
@@ -535,13 +707,13 @@ k3d.cluster.get_or_create/%:; $(call containerized.maybe, k3d)
 	$(call log.k8s, k3d.cluster.get_or_create ${sep} ${bold}${*})
 	${make} flux.do.unless/k3d.cluster.create/${*},k3d.has_cluster/${*}
 k3d.cluster.list k3d.list:; $(call containerized.maybe, k3d)
-	@# Returns cluster-names, newline delimited.  See 
-	@# `k3d.stat` for human friendly summary, with more details.
+	@# Returns cluster-names, newline delimited.  Available as a macro.
+	@# For more details in a human friendly summary, see `k3d.stat`.
 	@# 
 	@# USAGE:  
 	@#   ./k8s.mk k3d.cluster.list
-.k3d.cluster.list .k3d.list:
-	k3d cluster list -o json | ${jq} -r '.[].name' | xargs -n1 echo
+.k3d.cluster.list .k3d.list:; ${k3d.cluster.list}
+k3d.cluster.list=k3d cluster list -o json | ${jq} -r '.[].name' | ${stream.nl.to.space}
 
 k3d.commander:
 	@# Starts a 4-pane TUI dashboard, using the commander layout.  
@@ -551,9 +723,9 @@ k3d.commander:
 	@#   KUBECONFIG=.. ./k8s.mk k3d.commander/<namespace>
 	@# 
 	$(call log.k8s, k3d.commander ${sep} ${no_ansi_dim}Opening commander TUI for k3d)
-	geometry="${GEO_K3D}" ${make} tux.open/flux.loopf/k9s,flux.loopf/k3d.stat
+	geometry="${GEO_K3D}" CMK_INTERNAL=0 ${make} tux.open/flux.loopf/k9s.ui,flux.loopf/k3d.stat
 
-# TUI_CMDR_PANE_COUNT=5 TUI_LAYOUT_CALLBACK=.k3d.commander.layout ${make} tux.commander
+# TUI_CMDR_PANE_COUNT=5 TUX_LAYOUT_CALLBACK=.k3d.commander.layout ${make} tux.commander
 # k3d.commander/%:
 # 	@# A TUI interface like 'k3d.commander', but additionally sends the given target(s) to the main pane.
 # 	@#
@@ -580,14 +752,14 @@ k3d.commander:
 k3d.help:; ${make} mk.namespace.filter/k3d.
 	@# Shows targets for just the 'k3d' namespace.
 
-k3d.panic:
+k3d.panic:; $(call containerized.maybe, k3d)
 	@# Non-graceful stop for everything that is k3d related. 
 	@# 
 	@# USAGE:  
 	@#   ./k8s.mk k3d.panic
-	@# 
+.k3d.panic:
 	$(call log.k8s, ${@} ${sep} Stopping all k3d containers)
-	(${make} k3d.ps || echo -n) | xargs -I% bash -x -c "docker stop -t 1 %"
+	${k3d.cluster.list} | ${flux.each}/k3d.cluster.delete
 
 k3d.stat:; $(call containerized.maybe, k3d)
 	@# Show status for k3d.
@@ -611,10 +783,11 @@ k3d.stat:; $(call containerized.maybe, k3d)
 ## kubectl are not available.
 ##
 ## DOCS: 
-##   [1] https://robot-wranglers.github.io/k8s-tools/api#api-k8s
-##   [2] https://kubernetes.io/docs/reference/using-api/server-side-apply/
+##   * [1] https://robot-wranglers.github.io/k8s-tools/api#api-k8s
+##   * [2] https://kubernetes.io/docs/reference/using-api/server-side-apply/
 ##
 #░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+
 k8s.pod.shell/%:
 	@# This drops into a debugging shell for the named pod using `kubectl exec`,
 	@# plus a streaming version of the same which allows for working with pipes.
@@ -645,7 +818,7 @@ k8s.pod.shell/%:
 		-n $${namespace} -it $${pod_name} -- $${ishell}" \
 	&& docker compose -f ${K8S_TOOLS} run -it -e CMK_INTERNAL=1 k8s sh -x -c "$${script}"
 
-.k8s.pod.shell/%:
+kubectl.pod.shell/%:
 	namespace=`echo ${*}|cut -d/ -f1` \
 	&& pod_name=`echo ${*}|cut -d/ -f2` \
 	&& case $${user:-} in \
@@ -656,26 +829,26 @@ k8s.pod.shell/%:
 	&& kubectl exec \
 		-n $${namespace} -it $${pod_name} -- $${ishell}
 
-k8s.get/% kubectl.get/%:; $(call containerized.maybe, k8s)
-.k8s.get/% .kubectl.get/%:
-	@# Returns resources under the given namespace, for the given kind.
-	@# This can also be used with a 'jq' query to grab deeply nested results.
-	@# Pipe Friendly: results are always JSON.  Caller should handle errors.
-	@#
-	@# USAGE: 
-	@#	 ./k8s.mk kubectl.get/<namespace>/<kind>/<resource_name>/<jq_filter>
-	@#
-	@# Argument for 'kind' must be provided, but may be "all".  
-	@# Argument for 'filter' is optional.
-	@#
-	$(eval export pathcomp:=$(shell echo ${*}| sed -e 's/\// /g'))
-	$(eval export namespace:=$(strip $(shell echo ${*} | awk -F/ '{print $$1}')))
-	$(eval export kind:=$(strip $(shell echo ${*} | awk -F/ '{print $$2}')))
-	$(eval export name:=$(strip $(shell echo ${*} | awk -F/ '{print $$3}')))
-	$(eval export filter:=$(strip $(shell echo ${*} | awk -F/ '{print $$4}')))
-	export cmd_t="kubectl get $${kind} $${name} -n $${namespace} -o json | jq -r $${filter}" \
-	&& $(call log.k8s, kubectl.get${no_ansi_dim} // $${cmd_t}) \
-	&& eval $${cmd_t}
+# k8s.get/% kubectl.get/%:; $(call containerized.maybe, k8s)
+# .k8s.get/% .kubectl.get/%:
+# 	@# Returns resources under the given namespace, for the given kind.
+# 	@# This can also be used with a 'jq' query to grab deeply nested results.
+# 	@# Pipe Friendly: results are always JSON.  Caller should handle errors.
+# 	@#
+# 	@# USAGE: 
+# 	@#	 ./k8s.mk kubectl.get/<namespace>/<kind>/<resource_name>/<jq_filter>
+# 	@#
+# 	@# Argument for 'kind' must be provided, but may be "all".  
+# 	@# Argument for 'filter' is optional.
+# 	@#
+# 	$(eval export pathcomp:=$(shell echo ${*}| sed -e 's/\// /g'))
+# 	$(eval export namespace:=$(strip $(shell echo ${*} | awk -F/ '{print $$1}')))
+# 	$(eval export kind:=$(strip $(shell echo ${*} | awk -F/ '{print $$2}')))
+# 	$(eval export name:=$(strip $(shell echo ${*} | awk -F/ '{print $$3}')))
+# 	$(eval export filter:=$(strip $(shell echo ${*} | awk -F/ '{print $$4}')))
+# 	export cmd_t="kubectl get $${kind} $${name} -n $${namespace} -o json | jq -r $${filter}" \
+# 	&& $(call log.k8s, kubectl.get${no_ansi_dim} // $${cmd_t}) \
+# 	&& eval $${cmd_t}
 
 k8s.namespace.purge.by.prefix/%:
 	@# Runs a separate purge for every matching namespace.
@@ -727,7 +900,7 @@ k8s.graph.tui: k8s.graph.tui/all/pods
 # 	${make} flux.loopf/k8s.graph.tui/${*}
 
 k8s.graph.tui/%:
-	@# Previews topology for a given kubernetes <namespace>/<kind> in a way that's terminal-friendly.
+	@# Previews topology for a given kubernetes <namespace>/<kind> in a way that is terminal-friendly.
 	@#
 	@# This is a human-friendly way to visualize progress or changes, because it supports 
 	@# very large input data from complex deployments with lots of services/pods, either in 
@@ -813,7 +986,7 @@ k8s.namespace.label/%:
 	; printf "\"$${key}\": \"$${val}\"}}}}") | ${jq} . \
 	| ${make} k8s.ansible
 
-k8s.namespace.purge/%:; $(call containerized.maybe, kubectl)
+k8s.namespace.purge/%:; $(call containerized.maybe, k8s)
 	@# Wipes everything inside the given namespace.
 	@#
 	@# USAGE: 
@@ -823,8 +996,22 @@ k8s.namespace.purge/%:; $(call containerized.maybe, kubectl)
 	${trace_maybe} \
 	&& kubectl delete namespace --cascade=foreground ${*} -v=9 2>/dev/null || true
 
-k8s.namespace.wait/%:; ${make} k8s.dispatch.quiet/kubectl.namespace.wait/${*}
-	@# Waits for every pod in the given namespace to be ready.
+k8s.jobs.wait: k8s.jobs.wait/all
+	@# Wait for all jobs in all namespaces
+k8s.jobs.wait/%:; $(call containerized.maybe, k8s)
+	@# Wait for all jobs in the given namespace
+.k8s.jobs.wait/%:; ${make} kubectl.jobs.wait/${*}
+
+k8s.pods.wait: k8s.pods.wait/all
+	@# Wait for all pods in all namespaces
+k8s.pods.wait/%:; $(call containerized.maybe, k8s)
+	@# Wait for all pods in the given namespace
+.k8s.pods.wait/%:; ${make} kubectl.pods.wait/${*}
+
+k8s.namespace.wait: k8s.namespace.wait/all
+	@# Wait for all pods in all namespaces
+k8s.namespace.wait/%:; $(call containerized.maybe, k8s)
+	@# Waits for every pod/job in the given namespace to be ready.
 	@#
 	@# This uses only kubectl/jq to loop on pod-status, but assumes that 
 	@# the krew-plugin 'sick-pods'[1] is available for formatting the 
@@ -837,55 +1024,14 @@ k8s.namespace.wait/%:; ${make} k8s.dispatch.quiet/kubectl.namespace.wait/${*}
 	@#
 	@# REFS:
 	@#   * `[1]`: https://github.com/alecjacobs5401/kubectl-sick-pods
+.k8s.namespace.wait/%:
+	${make} kubectl.namespace.wait/${*} kubectl.jobs.wait/${*}
+
 .wait_cmd="gum \
 	spin --spinner $${spinner:-jump} \
 	--spinner.foreground=$${color:-39} \
 	--title=\"Waiting ${K8S_POLL_DELTA}s\" \
 	-- sleep ${K8S_POLL_DELTA}"
-kubectl.namespace.wait/%:
-	@# FIXME: use ${set_scope}
-	${set_scope} \
-	&& header="k8s.namespace.wait ${sep} ${dim}ctx=${dim_cyan}${kubectx} ${sep} ${green}${*}${no_ansi}" \
-	&& $(call log.k8s, $${header} ${sep}${dim} Looking for pods in state=waiting) \
-	&& until \
-		kubectl get pods $${scope} -o json 2> /dev/null \
-		| jq '${.filter.waiting}' 2> /dev/null \
-		| jq '.[] | halt_error(length)' 2> /dev/null \
-	; do \
-		${.sick.pods} \
-		&& $(call log, $${header} ${sep}${dim} ${io.timestamp} ${sep} ${bold}Pods not ready yet)\
-		&& eval ${.wait_cmd}; \
-	done \
-	&& $(call log.k8s, $${header} ${sep}${dim} ${io.timestamp} ${sep} No pods waiting ${GLYPH_SPARKLE}) \
-	&& ${make} k8s.pods \
-	&& case $${strict:-0} in \
-		0) true;; \
-		*) ${make} .k8s.namespace.pending/${*} ;; \
-	esac
-.filter.waiting=[.items[].status.containerStatuses[]|select(.state.waiting)]
-.filter.pending=[.items[].status.containerStatuses[]|select(.state.waitingzzzzzzzzzzz)]
-define .sick.pods 
-kubectl sick-pods $${scope} 2>&1 \
-	| sed 's/^[ \t]*//'\
-	| sed "s/FailedMount/$(shell printf "${yellow}Failed${no_ansi}")/g" \
-	| sed "s/streaming log results:/streaming log results:\n\t/g" \
-	| sed "s/is not ready! Reason Provided: None/$(shell printf "${bold}not ready!${no_ansi}")/g" \
-	| sed 's/ in pod /\n\t\tin pod /g' \
-	| sed -E 's/assigned (.*) to (.*)$$/assigned \1/g' \
-	| sed "s/Failed\n\n/$(shell printf "${yellow}Failed${no_ansi}")/g" \
-	| sed "s/Scheduled/$(shell printf "${yellow}Scheduled${no_ansi}")/g" \
-	| sed "s/Pulling/$(shell printf "${green}Pulling${no_ansi}")/g" \
-	| sed "s/Warning/$(shell printf "${yellow}Warning${no_ansi}")/g" \
-	| sed "s/Pod Conditions:/$(shell printf "☂${dim_green}${underline}Pod Conditions:${no_ansi}")/g" \
-	| sed "s/Pod Events:/$(shell printf "${underline}${dim_green}Pod Events:${no_ansi}")/g" \
-	| sed "s/Container Logs:/$(shell printf "${underline}${dim_green}Container Logs:${no_ansi}")/g" \
-	| sed "s/ContainerCreating/$(shell printf "${green}ContainerCreating${no_ansi}")/g" \
-	| sed "s/ErrImagePull/$(shell printf "${yellow}ErrImagePull${no_ansi}")/g" \
-	| sed "s/ImagePullBackOff/$(shell printf "${yellow}ImagePullBackOff${no_ansi}")/g" \
-	| sed ':a;N;$$!ba;s/\n\n/\n/g' \
-	| tr '☂' '\n' 2>/dev/null | ${stream.dim} > ${stderr} \
-&& printf '\n'>/dev/stderr 
-endef
 .k8s.namespace.pending/%:
 	${set_scope} \
 	&& header="k8s.namespace.pending ${sep} ${dim}ctx=${dim_cyan}${kubectx} ${sep} ${green}${*}${no_ansi}" \
@@ -899,21 +1045,25 @@ endef
 	done \
 
 set_scope=scope=`[ "${*}" == "all" ] && echo "--all-namespaces" || echo "-n ${*}"`
-.format.pod_columns=custom-columns=NAME:.metadata.name,READY:.status.containerStatuses[*].ready,STATUS:.status.phase,RESTARTS:.status.containerStatuses[*].restartCount
 .format.header=awk 'NR==1{print "${dim_cyan}${bold}" $$0 "${no_ansi_dim}";next}{print $$0}'
 k8s.pods k8s.pods.all: k8s.pods/all
 	@# Returns information about pods in all namespaces.  
 	@# Not for parsing; this info is human friendly, and output to logging channel.
 k8s.pods/%:; $(call containerized.maybe, k8s)
-	@# Shows human pods for all namespaces, excluding ones with "completed" status.
+	@# Shows pods for the given namespace, excluding ones with "completed" status.
 	@# Not for parsing; this info is human friendly, and output to logging channel.
-.k8s.pods/%:
-	${set_scope} \
-	&& ( kubectl get pods $${scope} \
-			--field-selector=status.phase!=Completed \
-			-o "${.format.pod_columns}" | ${.format.header} \
-		) | ${stream.as.log}
-k8s.pods.watch:; entrypoint=watch cmd="-n1 kubectl get po -A" ${make} k8s
+.k8s.pods/%:; ${make} kubectl.pods/${*}
+# k8s.pods.watch:; entrypoint=watch cmd="-n1 kubectl get po -A" ${make} k8s
+
+k8s.svc/%:; $(call containerized.maybe, k8s)
+	@# Shows services for the given namespace
+	@# Not for parsing; this info is human friendly, and output to logging channel.
+.k8s.svc/%:; ${make} kubectl.svc/${*}
+
+k8s.deployments/%:; $(call containerized.maybe, k8s)
+	@# Shows deployments for the given namespace
+	@# Not for parsing; this info is human friendly, and output to logging channel.
+.k8s.deployments/%:; ${make} kubectl.deployments/${*}
 
 k8s.ready k8s.cluster.ready:; $(call containerized.maybe, k8s)
 	@# Checks whether the cluster is available.  
@@ -928,7 +1078,6 @@ k8s.ready k8s.cluster.ready:; $(call containerized.maybe, k8s)
 	@#
 	@# REFS:
 	@#   * `[1]`: https://github.com/alecjacobs5401/kubectl-sick-pods
-	@#
 .k8s.ready .k8s.cluster.ready:
 	hdr="k8s.cluster.ready ${sep} ctx=${dim_cyan}${kubectx} ${sep}" \
 	&& kubectl cluster-info > /dev/null 2>&1 \
@@ -945,7 +1094,7 @@ k8s.stat:; $(call containerized.maybe, k8s)
 	@# This is just for user information, as it's generated from 
 	@# a bunch of tools that are using very different output styles.
 	@#
-	@# For a shorter, looping version that's suitable as a tmux widget, see 'k8s.stat.widget'
+	@# For a shorter, looping version that is suitable as a tmux widget, see 'k8s.stat.widget'
 	@#
 	tmp1=`kubectx -c||true` && tmp2=`kubens -c || true` \
 		&& $(call log.k8s, k8s.stat ${no_ansi_dim}ctx=${green}${underline}$${tmp1}${no_ansi_dim} ns=${green}${underline}$${tmp2}) \
@@ -998,15 +1147,16 @@ endef
 	&& case "$${wait:-}$${interactive:-}" in \
 		"") true;; \
 		*) $(call log.k8s,$${hdr} Waiting for namespace to become ready..) \
-			&& ${make} k8s.namespace.wait/$${namespace};; \
+			&& ${make} kubectl.pods.wait/$${namespace};; \
 	esac \
 	&& case "$${interactive:-}" in \
 		"") true;; \
-		*) ${make} .k8s.pod.shell/$${namespace}/$${name};; \
+		*) ${make} kubectl.pod.shell/$${namespace}/$${name};; \
 	esac
 
-k8s.wait k8s.cluster.wait: k8s.namespace.wait/all
+k8s.wait k8s.cluster.wait: k8s.namespace.wait k8s.jobs.wait
 	@# Waits until all pods in all namespaces are ready.  (Alias for 'k8s.namespace.wait/all')
+# k8s.wait.quiet/%:; ${make} k8s.jobs.wait/${*} k8s.pods.wait/${*}
 k8s.stat.env:
 	@# Shows cluster, kube, and docker environment variables
 	@#
@@ -1014,7 +1164,7 @@ k8s.stat.env:
 	(   (env | grep CLUSTER || true) \
 	  ; (env | grep KUBE    || true) \
 	  ; (env | grep DOCKER  || true) \
-	) | ${stream.indent} 
+	) | ${stream.grep.safe} | ${stream.indent} 
 
 k8s.stat.ns:
 	@# Shows all namespaces for the current cluster.
@@ -1023,48 +1173,58 @@ k8s.stat.ns:
 	kubens | ${stream.indent} 
 
 k8s.kubectx: k8s.dispatch.quiet/kubectl.kubectx
-
+	@# Returns `kubectx` result
 #░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 ## BEGIN 'kubetail.*' targets
-## kubetail doesnt honor KUBECONFIG in environment, hence the explicit usage 
-## of file below. See [2]
+##
+## Note that kubetail doesnt honor KUBECONFIG in environment, therefore 
+## all targets must reference file specifically. See the related issue `[2]`
 ## 
 ## DOCS: 
-##  [1] https://robot-wranglers.github.io/k8s-tools/api#api-kubectl
-##  [2] https://github.com/kubetail-org/kubetail/issues/225
+##  `[1]`: https://robot-wranglers.github.io/k8s-tools/api#api-kubectl
+##  `[2]`: https://github.com/kubetail-org/kubetail/issues/225
 #░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 
-kubetail/%:; 
-	@# Runs `kubetail logs` with the given argument
-	kubetail --kubeconfig $${KUBECONFIG} logs ${*}
-kubetail.serve:; $(call containerized.maybe, k8s)
-.kubetail.serve:
-	set -x && kubetail serve --skip-open \
-		--kubeconfig $${KUBECONFIG} \
-		--port 9999 --host 0.0.0.0 
+# kubetail/%:; $(call containerized.maybe, k8s)
+# 	@# Runs `kubetail logs` with the given argument
+# 	kubetail --kubeconfig $${KUBECONFIG} logs ${*}
+kubetail/%:; $(call containerized.maybe, k8s)
+	@# USAGE:
+	@#   kubetail.logs/<namespace>/<kind>/<filter>
+	@#   kubetail.logs/fission/deployments/*
+	@#   kubetail.logs/fission/deployments/*,fission/pods/*
+.kubetail/%:
+	case ${*} in \
+		*,*) cmd="`printf "${*}" \
+			| ${stream.comma.to.nl} \
+			| xargs -I% echo ..kubetail/% | ${stream.nl.to.space}`";; \
+		*) cmd="..kubetail/${*}";; \
+	esac \
+	&& ${make} $${cmd}
+..kubetail/%:
+	scope="`echo ${*} | cut -d/ -f1`" \
+	&& kind="`echo ${*} | cut -d/ -f2`" \
+	&& rest="`echo ${*} | cut -d/ -f3-| sed 's/all$$/*/'`"  \
+	&& $(call log.k8s, kubetail.logs ${sep} ${dim_cyan}$${scope} ${sep} ${dim}kind=${bold}$${kind} ${no_ansi_dim}filter=${ital}$${rest}) \
+	&& kubetail --kubeconfig $${KUBECONFIG} logs $${scope}:$${kind}/$${rest} |${jq} . | ${stream.as.log}
+
+kubetail.serve: kubetail_server.up
+kubetail.serve.bg: kubetail_server.up.detach
+# .kubetail.serve:
+# 	set -x && kubetail serve --skip-open \
+# 		--kubeconfig $${KUBECONFIG} \
+# 		--port 9999 --host 0.0.0.0 
+# kubetail.serve.detach: k8s.exec.detach/.kubetail.serve
 
 #░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 ## BEGIN 'kubectl.*' private targets
 ## DOCS: 
 ##   [1] https://robot-wranglers.github.io/k8s-tools/api#api-kubectl
 #░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
-
-kubectl.namespace.create/%:
-	@# Idempotent version of namespace-create.
-	@#
-	@# USAGE: 
-	@#    kubectl.namespace.create/<namespace>
-	@#
-	$(call log.k8s, kubectl.namespace.create ${sep} ${bold}${*})
-	server_side=1 \
-	&& kubectl create namespace ${*} --dry-run=client -o yaml \
-		| ${stream.peek} | $(call _kubectl.apply, -)
-
 kubectl.quiet=>(grep -v "missing the kubectl.kubernetes.io/last-applied-configuration annotation")
 _kubectl.apply=kubectl apply \
 		`[ -z "$${server_side:-}" ] && echo "" || echo "--force-conflicts --server-side"` \
 		-f ${1} 2> ${kubectl.quiet}
-_kubectl.create=kubectl create -f ${1}
 kubectl.apply/%:
 	@# Runs kubectl apply on the given file,
 	@# Also available as a macro.
@@ -1077,28 +1237,53 @@ kubectl.apply.stdin:
 	@#
 	$(call log.k8s, ${@} ${sep} ${cyan_flow_left})
 	${kubectl.apply.stdin}
-
+stream.kubectl.apply=${kubectl.apply.stdin}
 kubectl.apply.stdin= \
 	${stream.stdin} \
 		| ${stream.peek} \
 		| $(call _kubectl.apply, -)
 
-kubectl.create/%:; $(call _kubectl.create, ${*})
-kubectl.create.stdin:; $(call _kubectl.create, -)
-kubectl.create.url:; ${io.get.url} && ${make} kubectl.create/$${tmpf}
-
 kubectl.apply.url:; ${io.get.url} && ${make} kubectl.apply/$${tmpf} | ${stream.as.log}
 	@# Apply URL.  Rather than handing the URL directly to kubectl, 
-	@# this downloads the file first and applies as usual.
-	@# Also available as a macro.
+	@# this  downloads the file first and applies as usual for
+	@# simple previews. Also available as a macro.
 kubectl.apply.url=${make} kubectl.apply.url
 
-kubectl.namespace.list:
-	@# Returns all namespaces in a simple array.
-	@# NB: Must remain suitable for use with `xargs`!
+kubectl.cluster.stat:
+	@# Shows cluster status.
 	@#
-	kubectl get namespaces -o json \
-		| ${jq} -r '.items[].metadata.name'
+	$(call log.k8s, ${@} ${sep}${no_ansi_dim} Showing cluster status..)
+	kubectl version -o json 2>/dev/null | jq . || true
+	kubectl cluster-info -o json 2>/dev/null  | jq . || true
+
+_kubectl.create=kubectl create -f ${1}
+kubectl.create/%:
+	@# Interface for kubectl create.
+	$(call _kubectl.create, ${*}) 2> >(grep -v 'already exists$$') \
+	; result=$$? \
+	&& strict=$${strict:-1} \
+	&& case $${result} in \
+		0) true;; \
+		*) case $${strict} in \
+			0) $(call log.k8s, ${yellow}kubectl.create${dim} failed but strict=$${strict} and partial updates are allowed);; \
+			*) exit $${result};; \
+			esac;; \
+	esac
+
+kubectl.create.stdin:; $(call _kubectl.create, -)
+	@# Like `kubectl.create`, but accepts file-input on stdin
+kubectl.create.url:; ${io.get.url} && ${make} kubectl.create/$${tmpf}
+	@# Like `kubectl.create`, but expects that `url` is set in environment.
+
+
+kubectl.get.pod_names:; kubectl get pods -o=jsonpath='{.items[*].metadata.name}'
+kubectl.get.nodes:
+	@# Status for nodes. 
+	@# Not machine-friendly.  See instead 'kubectl.get'.
+	@#
+	node_count=`kubectl get nodes -oname|wc -l` \
+	&& $(call log.k8s, ${@} (${no_ansi}${green}$${node_count}${no_ansi_dim} total))
+	kubectl get nodes
 
 kubectl.exec.pipe/%:
 	@# Stream commands into the named pod.
@@ -1110,29 +1295,166 @@ kubectl.exec.pipe/%:
 	&& pod_name=$(shell echo ${*}|awk -F/ '{print $$2}') \
 	&& ${stream.stdin} | docker compose -f ${K8S_TOOLS} run -T k8s \
 		sh -x -c "KUBECONFIG=${KUBECONFIG} kubectl exec -n $${namespace} -i $${pod_name} -- bash"
-kubectl.pod.get/%:; kubectl get pod ${*} -o JSON
-kubectl.pods.get:; kubectl get pod ${*} -o JSON
 
-kubectl.get.pod_names:; kubectl get pods -o=jsonpath='{.items[*].metadata.name}'
-kubectl.get.nodes:
-	@# Status for nodes. 
-	@# Not machine-friendly.  See instead 'kubectl.get'.
-	@#
-	node_count=`kubectl get nodes -oname|wc -l` \
-	&& $(call log.k8s, ${@} (${no_ansi}${green}$${node_count}${no_ansi_dim} total))
-	kubectl get nodes
 kubectl.kubectx:
-	@#
-	@#
+	@# Displays output of kubectx to stderr.
 	$(call log.k8s, ${@} ${sep} ${no_ansi_dim}Showing cluster context)
 	kubectx | ${stream.indent} 
 
-kubectl.cluster.stat:
-	@# Shows cluster status.
+kubectl.wait: kubectl.jobs.wait/all kubectl.namespace.wait/all 
+	@# Wait for all pods and all jobs in all namespaces to finish
+
+kubectl.jobs.wait: kubectl.jobs.wait/all
+	@# Wait for all jobs in all namespaces to finish
+kubectl.pods.wait: kubectl.pods.wait/all
+	@# Wait for all pods in all namespaces to finish
+
+
+kubectl.pods.wait/%:
+	@# Wait for all jobs to finish inside the given namespace
+	${set_scope} \
+	&& header="k8s.pods.wait ${sep} ${dim}ctx=${dim_cyan}${kubectx} ${sep} ${dim}ns=${dim_cyan}${*}${no_ansi}" \
+	&& $(call k8s.log.part1, $${header} ${sep}${dim} Looking for pending pods) \
+	&& pod_count=`kubectl get pods $${scope} --no-headers 2>/dev/null| ${stream.count.lines}` \
+	&& case $${pod_count} in \
+		0) $(call k8s.log.part2,${GLYPH_CHECK} No pods found); exit 0;; \
+		*) $(call k8s.log.part2,$${pod_count});; \
+	esac \
+	&& (kubectl wait $${scope} \
+		--for=condition=Ready pod \
+		--all --timeout=9999s | ${stream.as.log} )\
+	|| \
+		($(call k8s.log,$${header}Timeout or interrupt ${sep} ${no_ansi} Pods not ready) \
+			&& kubectl get pods $${scope} -o wide | ${stream.as.log} && exit 1) \
+	&& failed_pods=$$(\
+		kubectl get pods $${scope} --no-headers 2>/dev/null \
+		| grep -E 'CrashLoopBackOff|ErrImagePull|ImagePullBackOff|CreateContainerConfigError|RunContainerError|InvalidImageName|Error|Failed' || true ) \
+	&& $(call k8s.log.part1, $${header} ${sep}${dim} Status) \
+	&& case "$${failed_pods}" in \
+		"") $(call k8s.log.part2,${GLYPH_CHECK} Ready);; \
+		*) $(call k8s.log.part2,Not Ready); kubectl describe pods $${scope}; exit 1;; \
+	esac
+kubectl.jobs.wait/%:
+	@# Wait for all jobs to finish inside the given namespace
+	${set_scope} \
+	&& hdr="k8s.jobs.wait ${sep} ${dim}ctx=${dim_cyan}${kubectx} ${sep} ${dim}ns=${dim_cyan}${*}${no_ansi}" \
+	&& $(call k8s.log.part1, $${hdr} ${sep}${dim} looking for unfinished jobs) \
+	&& data="`kubectl get jobs $${scope} --no-headers=true 2>/dev/null`" \
+	&& count="`printf "$${data}" | ${stream.count.lines}`" \
+	&& [ -z "$${data}" ] \
+		&& $(call k8s.log.part2, ${GLYPH_CHECK} None found) \
+		|| ( \
+			$(call k8s.log.part2, ${yellow}$${count}) \
+			&& printf "$${data}" \
+			| ${stream.peek} | awk '{print $$1}' \
+			| ${io.xargs} "\
+				kubectl wait $${scope} --for=condition=complete job/%" \
+			| ${stream.as.log})
+kubectl.namespace.wait/%:
+	@# FIXME: use ${set_scope}
+	${set_scope} \
+	&& header="k8s.namespace.wait ${sep} ${dim}ctx=${dim_cyan}${kubectx} ${sep} ${dim}ns=${dim_cyan}${*}${no_ansi}" \
+	&& $(call log.k8s, $${header} ${sep}${dim} Looking for pods in state=waiting) \
+	&& until \
+		kubectl get pods $${scope} -o json 2> /dev/null \
+		| jq '${.filter.waiting}' 2> /dev/null \
+		| jq '.[] | halt_error(length)' 2> /dev/null \
+	; do \
+		${.sick.pods} \
+		&& $(call log, $${header} ${sep}${dim} ${io.timestamp} ${sep} ${bold}Pods not ready yet)\
+		&& eval ${.wait_cmd}; \
+	done \
+	&& $(call log.k8s, $${header} ${sep}${dim} ${io.timestamp} ${sep} No pods waiting ${GLYPH_SPARKLE}) \
+	&& ${make} kubectl.pods/${*} \
+	&& case $${strict:-0} in \
+		0) true;; \
+		*) ${make} .k8s.namespace.pending/${*} ;; \
+	esac
+.filter.waiting=[.items[].status.containerStatuses[]|select(.state.waiting)]
+.filter.pending=[.items[].status.containerStatuses[]|select(.state.pending)]
+define .sick.pods 
+kubectl sick-pods $${scope} 2>&1 \
+	| sed 's/^[ \t]*//'\
+	| sed "s/FailedMount/$(shell printf "${yellow}Failed${no_ansi}")/g" \
+	| sed "s/streaming log results:/streaming log results:\n\t/g" \
+	| sed "s/is not ready! Reason Provided: None/$(shell printf "${bold}not ready!${no_ansi}")/g" \
+	| sed 's/ in pod /\n\t\tin pod /g' \
+	| sed -E 's/assigned (.*) to (.*)$$/assigned \1/g' \
+	| sed "s/Failed\n\n/$(shell printf "${yellow}Failed${no_ansi}")/g" \
+	| sed "s/Scheduled/$(shell printf "${yellow}Scheduled${no_ansi}")/g" \
+	| sed "s/Pulling/$(shell printf "${green}Pulling${no_ansi}")/g" \
+	| sed "s/Warning/$(shell printf "${yellow}Warning${no_ansi}")/g" \
+	| sed "s/Pod Conditions:/$(shell printf "☂${dim_green}${underline}Pod Conditions:${no_ansi}")/g" \
+	| sed "s/Pod Events:/$(shell printf "${underline}${dim_green}Pod Events:${no_ansi}")/g" \
+	| sed "s/Container Logs:/$(shell printf "${underline}${dim_green}Container Logs:${no_ansi}")/g" \
+	| sed "s/ContainerCreating/$(shell printf "${green}ContainerCreating${no_ansi}")/g" \
+	| sed "s/ErrImagePull/$(shell printf "${yellow}ErrImagePull${no_ansi}")/g" \
+	| sed "s/ImagePullBackOff/$(shell printf "${yellow}ImagePullBackOff${no_ansi}")/g" \
+	| sed ':a;N;$$!ba;s/\n\n/\n/g' \
+	| tr '☂' '\n' 2>/dev/null | ${stream.dim} > ${stderr} \
+&& printf '\n'>/dev/stderr 
+endef
+k8s.get.svc/%:; $(call containerized.maybe, k8s)
 	@#
-	$(call log.k8s, ${@} ${sep}${no_ansi_dim} Showing cluster status..)
-	kubectl version -o json 2>/dev/null | jq . || true
-	kubectl cluster-info -o json 2>/dev/null  | jq . || true
+	@# USAGE:
+	@#   k8s.get.svc/<ns>/<name>/<filter>
+	@#   k8s.get.svc/ab-testing/coin-service/.spec.clusterIP
+.k8s.get.svc/%:; ${make} kubectl.get.svc/${*}
+
+kubectl.get=kubectl get $${kind} -n $${ns} $${id} -o json | ${jq} -re $${jsonpath}
+kubectl.get.svc/%:
+	@#
+	@# USAGE:
+	@#   kubectl.get.svc/<ns>/<name>/<filter>
+	@#   kubectl.get.svc/ab-testing/coin-service/.spec.clusterIP
+	@#
+	ns=`echo ${*}|cut -d/ -f1` \
+	&& id=`echo ${*}|cut -d/ -f2` \
+	&& jsonpath=`echo ${*}|cut -d/ -f3-` \
+	&& kind=svc && ${kubectl.get}
+kubectl.namespace.create/%:
+	@# Idempotent version of namespace-create.
+	@#
+	@# USAGE: 
+	@#    kubectl.namespace.create/<namespace>
+	@#
+	$(call log.k8s, kubectl.namespace.create ${sep} ${bold}${*})
+	server_side=1 \
+	&& kubectl create namespace ${*} --dry-run=client -o yaml \
+		| ${stream.peek} | $(call _kubectl.apply, -)
+
+kubectl.namespace.list:
+	@# Returns all namespaces in a simple array.
+	@# NB: Must remain suitable for use with `xargs`!
+	@#
+	kubectl get namespaces -o json \
+		| ${jq} -r '.items[].metadata.name'
+
+kubectl.pods/%:
+	@# Show deployments in the given namespace
+	kind=pod \
+	kubectl_extra="\
+		--field-selector=status.phase!=Completed \
+		-o custom-columns=NAME:.metadata.name,READY:.status.containerStatuses[*].ready,STATUS:.status.phase,RESTARTS:.status.containerStatuses[*].restartCount" \
+	${make} kubectl.show/${*}
+
+kubectl.show/%:
+	@# Show the given types in the given namespace
+	$(call log.k8s, kubectl.show ${sep} ${dim}ns=${dim_green}${*} ${sep} ${dim}kind=${no_ansi}${bold}$${kind}) \
+	&& ${trace_maybe} \
+	&& ( kubectl get $${kind} \
+			-n ${*} \
+			$${kubectl_extra:-} \
+		) | ${.format.header} | ${stream.as.log}
+
+kubectl.deployments/%:; kind=deployments ${make} kubectl.show/${*}
+	@# Show deployments in the given namespace
+	
+kubectl.svc/%:; kind=svc ${make} kubectl.show/${*}
+	@# Show services in the given namespace
+
+# kubectl.pod.get/%:; kubectl get pod ${*} -o JSON
+# kubectl.pods.get:; kubectl get pod ${*} -o JSON
 
 kubectl.stat.auth:
 	$(call log.k8s, ${@} ${sep}${dim} kubectl auth whoami )
@@ -1142,13 +1464,45 @@ kubectl.stat.auth:
 	&& printf "$${auth_info}\n"| jq .
 
 #░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
-## END: k8s.* targets
+## BEGIN: kompose.* targets
+##
+## A small interface for working with kompose.
+##
+## DOCS: 
+##   [1] https://robot-wranglers.github.io/k8s-tools/api#api-kompose
+#░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+
+_bash.run=($(call log.io, ${bold}${cyan_flow_right} ${dim}${1}); ${1} 2> >(cut -d' ' -f2-) | ${stream.as.log})
+
+stream.kompose.convert=${kompose.convert}/-
+kompose.convert/%:; set -x && kompose -f ${*} convert -o -
+	@# Runs `kompose convert` for the given file.
+	@# Outputs to stdout. Also available as a macro
+kompose.convert=${make} kompose.convert
+kompose.convert: kompose.convert/- 
+	@# Assumes stdin is a compose file, and runs `kompose.convert/`
+
+#░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+## BEGIN: istio.* targets
+##
+## A small interface for working with istioctl
+##
+## DOCS: 
+##   [1] https://robot-wranglers.github.io/k8s-tools/api#api-istio
+#░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+
+istio.validate/%:; $(call containerized.maybe, istioctl)
+.istio.validate/%:; istioctl analyze -n ${*} 
+
+istio.virtualservices/%:; $(call containerized.maybe, k8s)
+.istio.virtualservices/%:; kind=virtualservice ${make} kubectl.show/${*}
+
+#░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 ## BEGIN: kubefwd.* targets
 ##
 ## The *`kubefwd.*`* targets describe a small interface for working with kubefwd.  
 ## It aims to cleanly background / foreground `kubefwd` in an unobtrusive way, 
 ## with clean setup/teardown and reasonable defaults for usage per-project.
-##
 ##
 ## Forwarding is not just for ports but for DNS as well. 
 ## Note that this takes effect everywhere, including the containers inside
@@ -1157,6 +1511,77 @@ kubectl.stat.auth:
 ## DOCS: 
 ##   [1] https://robot-wranglers.github.io/k8s-tools/api#api-k8smk
 #░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+
+kubefwd.ctx/%:
+	@# This wraps the given target, using the given given kubefwd arguments.
+	@# See `flux.context_manager` docs for more details.
+	@#
+	@# Roughly equivalent:
+	@#   kubefwd.ctx/1st,2nd => kubefwd.start/2nd 1st kubefwd.stop/2nd
+	@#
+	target=$(call mk.unpack_arg,1) \
+	&& args=$(call mk.unpack_arg,2) \
+	&& $(call log.k8s, kubefwd.ctx ${sep} $${target} ${sep} $${args}) \
+	&& ${make} flux.with.ctx/$${target},kubefwd,$(call mk.unpack_arg,2)
+	
+kubefwd.enter/% kubefwd.start/% k8s.namespace.fwd/%:
+	@# Runs kubefwd for the given namespace, finding and forwarding ports/DNS for the given 
+	@# service, or for all services. This is idempotent, and implicitly stops port-forwarding 
+	@# if it is running, then restarts it. 
+	@#
+	@# NB: This target should only run from the docker host (not from the kubefwd container),  
+	@# and it assumes k8s-tools.yml is present with that filename. Simple port-mapping and 
+	@# filtering by name is supported; other usage with selectors/labels/reservations/etc 
+	@# should just invoke kubefwd directly.
+	@#
+	@# USAGE: 
+	@#   ./k8s.mk kubefwd/<namespace>
+	@#   ./k8s.mk kubefwd/<namespace>/<svc_name>
+	@#	 kubefwd_mapping="8080:80" ./k8s.mk kubefwd/<namespace> 
+	@#   kubefwd_mapping="8080:80" ./k8s.mk kubefwd/<namespace>/<svc_name>
+	@#
+	export pathcomp="$(shell echo ${*}| sed -e 's/\// /g')" \
+	&& export namespace="$(strip $(shell echo ${*} | awk -F/ '{print $$1}'))" \
+	&& export svc_name="$(strip $(shell echo ${*} | awk -F/ '{print $$2}'))" \
+	&& kubefwd_mapping=$${kubefwd_mapping:-} \
+	&& header="kubefwd ${sep} ${dim_green}$${namespace}" \
+	&& header="$${header} ${sep} ${bold_green}$${svc_name}" \
+	&& case "$${svc_name}" in \
+		"") filter=$${filter:-}; ;; \
+		*) \
+			filter="-f metadata.name=$${svc_name}";; \
+	esac \
+	&& case "$${kubefwd_mapping}" in \
+		"") true; ;; \
+		*) kubefwd_mapping="--mapping $${kubefwd_mapping}"; ;; \
+	esac \
+	&& ${make} kubefwd.stop/${*} \
+	&& cname=`CMK_INTERNAL=1 ${make} .kubefwd.container_name/${*}` \
+	&& fwd_cmd="kubefwd svc -n $${namespace} $${filter} $${kubefwd_mapping} -v" \
+	&& fwd_cmd_wrapped="docker compose -f ${K8S_TOOLS} run --name $${cname} --rm -d $${fwd_cmd}" \
+	&& $(call log.k8s, $${header} ${sep} ${cyan}start) \
+	&& $(call io.mktemp) \
+	&& $(call _bash.run,$${fwd_cmd_wrapped}) $(_compose_quiet) \
+	&& CMK_INTERNAL=1 ${make} flux.timeout/3/docker.logs/$${cname}
+
+
+kubefwd.exit/% kubefwd.stop/%:
+	@# Stops the named kubefwd instance.  Mostly for internal usage, 
+	@# usually you want 'kubefwd.start' or 'kubefwd.panic' instead.
+	@#
+	@# USAGE:
+	@#	./k8s.mk kubefwd.stop/<namespace>/<svc_name>
+	@#
+	export pathcomp="$(shell echo ${*}| sed -e 's/\// /g')" \
+	&& export namespace="$(strip $(shell echo ${*} | awk -F/ '{print $$1}'))" \
+	&& export svc_name="$(strip $(shell echo ${*} | awk -F/ '{print $$2}'))" \
+	&& timeout=30 \
+	&& header="kubefwd ${sep} ${dim_green}$${namespace}" \
+	&& header="$${header} ${sep} ${bold_green}$${svc_name}" \
+	&& $(call log.k8s, $${header} ${sep} ${dim_cyan}stop ${no_ansi_dim}timeout=${yellow}$${timeout}) \
+	&& ${trace_maybe} \
+	&& export name=`CMK_INTERNAL=1 ${make} .kubefwd.container_name/${*}` \
+	&& ${make} docker.stop 2>&1 | ${stream.as.log}
 
 kubefwd.panic:
 	@# Non-graceful stop for everything that is kubefwd related.
@@ -1179,75 +1604,16 @@ kubefwd.panic:
 	@#
 	$(eval export namespace:=$(strip $(shell echo ${*} | awk -F/ '{print $$1}')))
 	$(eval export svc_name:=$(strip $(shell echo ${*} | awk -F/ '{print $$2}')))
-	cname=kubefwd.`basename ${PWD}`.$${namespace}.$${svc_name:-all} \
-	&& printf $${cname}
+	cname="kubefwd.`basename ${PWD}`.$${namespace}.$${svc_name:-all}" \
+	&& printf "$${cname}"
 
 kubefwd.help:; ${make} mk.namespace.filter/kubefwd.
 	@# Shows targets for just the 'kubefwd' namespace.
 
-kubefwd.stop/%:
-	@# Stops the named kubefwd instance.
-	@# This is mostly for internal usage, usually you want 'kubefwd.start' or 'kubefwd.panic'
-	@#
-	@# USAGE:
-	@#	./k8s.mk kubefwd.stop/<namespace>/<svc_name>
-	@#
-	timeout=30 \
-	name=`${make} .kubefwd.container_name/${*}` \
-		${make} docker.stop || true
-
 kubefwd.stat: kubefwd.ps
 	@# Display status info for all kubefwd instances that are running
 
-kubefwd.start/% k8s.namespace.fwd/%:
-	@# Runs kubefwd for the given namespace, finding and forwarding ports/DNS for the given 
-	@# service, or for all services. This is idempotent, and implicitly stops port-forwarding 
-	@# if it is running, then restarts it. 
-	@#
-	@# NB: This target should only run from the docker host (not from the kubefwd container),  
-	@# and it assumes k8s-tools.yml is present with that filename. Simple port-mapping and 
-	@# filtering by name is supported; other usage with selectors/labels/reservations/etc 
-	@# should just invoke kubefwd directly.
-	@#
-	@# USAGE: 
-	@#   ./k8s.mk kubefwd/<namespace>
-	@#   ./k8s.mk kubefwd/<namespace>/<svc_name>
-	@#	 mapping="8080:80" ./k8s.mk kubefwd/<namespace> 
-	@#   mapping="8080:80" ./k8s.mk kubefwd/<namespace>/<svc_name>
-	@#
-	$(eval export pathcomp:=$(shell echo ${*}| sed -e 's/\// /g'))
-	$(eval export namespace:=$(strip $(shell echo ${*} | awk -F/ '{print $$1}')))
-	$(eval export svc_name:=$(strip $(shell echo ${*} | awk -F/ '{print $$2}')))
-	mapping=$${mapping:-} \
-	&& header="kubefwd ${sep} ${dim_green}$${namespace}" \
-	&& case "$${svc_name}" in \
-		"") filter=$${filter:-}; ;; \
-		*) \
-			filter="-f metadata.name=$${svc_name}"; \
-			header="$${header} ${sep} ${bold_green}$${svc_name}"; ;; \
-	esac \
-	&& case "$${mapping}" in \
-		"") true; ;; \
-		*) mapping="--mapping $${mapping}"; ;; \
-	esac \
-	&& ${make} kubefwd.stop/${*} \
-	&& cname=`${make} .kubefwd.container_name/${*}` \
-	&& fwd_cmd="kubefwd svc -n $${namespace} $${filter} $${mapping} -v" \
-	&& fwd_cmd_wrapped="docker compose -f k8s-tools.yml run --name $${cname} --rm -d $${fwd_cmd}" \
-	&& $(call log.k8s, $${header}) \
-	&& echo {} \
-		| ${make} stream.json.object.append key=namespace val="$${namespace}" \
-		| ${make} stream.json.object.append key=svc val="$${svc_name}" \
-		| ${stream.as.log} \
-	&& $(call log.k8s, kubefwd ${sep} ${dim}container=${no_ansi}$${cname}) \
-	&& $(call log.k8s, kubefwd ${sep} ${dim}cmd=${no_ansi}$${fwd_cmd}) \
-	&& $(call io.mktemp) \
-	&& bash -x -c "$${fwd_cmd_wrapped} > $${tmpf}" \
-	&& cid="`cat $${tmpf}|${stream.trim}`" \
-	&& cmd="docker logs -f $${cname}" timeout=3 ${make} flux.timeout.sh 
-
 #░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
-## END 'kubefwd.*' targets
 ## BEGIN Misc targets
 ## DOCS: 
 ##   [1] https://robot-wranglers.github.io/k8s-tools/api
@@ -1289,6 +1655,43 @@ k9: k9s.ui
 	@#   ./k8s.mk k9
 
 #░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+## BEGIN 'tilt.*' targets
+## DOCS: 
+##   [1] https://robot-wranglers.github.io/k8s-tools/api#api-tilt
+#░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+export TILT_PORT?=10350
+TILT_URL=http://localhost:${TILT_PORT}/r/(Tiltfile)/overview
+
+tilt.browser tilt.open: io.browser/TILT_URL
+	@# Open a webbrowser for tilt webUI
+
+tilt.get_logs/%:; $(call containerized.maybe, tilt)
+	@# Not to be confused with tilt.logs, which is the tool container 
+	@# USAGE: tilt.get_logs/<number_of_lines>
+.tilt.get_logs/%:; TILT_PORT=$${TILT_PORT:-10350}  tilt logs | tail -${*} | ${stream.as.log}
+
+tilt.serve/%: tilt.stop 
+	@# USAGE: tilt.serve/<Tiltfile>
+	export TILT_FILE=${*} \
+	&& ${make} tilt.up.detach io.wait/5 tilt.logs/10 
+tilt.stream:; $(call containerized.maybe, tilt)
+	@# Stream logs from tilt forever
+.tilt.stream:; TILT_PORT=$${TILT_PORT:-10350}  tilt logs --follow
+
+Tiltfile.from.url:
+	@# USAGE: 
+	@#   url=.. Tiltfile.from.url
+	${io.mktemp} \
+	&& ${io.curl} $${url} > $${tmpf} \
+	&& case $${quiet:-1} in \
+	  0) $(call log.preview.file, $${tmpf});; \
+	esac \
+	&& TILT_FILE=$${tmpf} ${make} tilt.serve
+
+# tilt.tilt_logs:; $(call containerized.maybe, tilt)
+# 	@#
+# .tilt.tilt_logs:; set -x && tilt logs
+#░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 ## BEGIN 'tui.*' targets
 ## DOCS: 
 ##   [1] https://robot-wranglers.github.io/k8s-tools/api#api-tui
@@ -1312,34 +1715,6 @@ export TUI_SVC_BUILD_ORDER:=dind_base,tux,k8s,dind,tui
 	&& $${setter} @themepack-status-left-area-middle-format \
 		"ctx=#(kubectx -c||echo ?) ns=#(kubens -c||echo ?)" \
 
-k8s.commander:
-	@# TUI layout providing an overview for docker.  
-	@# This has 3 panes by default, where the main pane is lazydocker, plus two utility panes.
-	@# Automation also ensures that lazydocker always starts with the "statistics" tab open.
-	@#
-	$(call log.k8s, ${@} ${sep}${dim} Opening commander TUI for k8s)
-	TUI_LAYOUT_CALLBACK=.tui.k8s.commander.layout \
-		TUI_CMDR_PANE_COUNT=4 ${make} tux.commander
-
-k8s.commander/%:
-	@# Sends the given target(s) to the main pane.
-	@#
-	@# USAGE:
-	@#   ./k8s.mk k8s.commander/<target1>,<target2>
-	@#
-	export k8s_commander_targets="${*}" && ${make} k8s.commander
-
-.tui.k8s.commander.layout: 
-	$(call log.k8s, ${@} ${sep} ${no_ansi_dim}Starting widgets and setting geometry..)
-	${make} .tux.pane/3/.tui.widget.k8s.topology.clear/kube-system
-	${make} .tux.pane/2/.tui.widget.k8s.topology.clear/default
-	${make} .tux.pane/1/flux.loopf/.tux.widget.env/K
-	${make} .tux.pane/0/flux.wrap/docker.stat,k8s.stat,$${k8s_commander_targets:-}
-	${make} .tux.commander.layout
-	title="main" ${make} .tux.pane.title/1
-	title="default namespace" ${make} .tux.pane.title/3
-	title="kube-system namespace" ${make} .tux.pane.title/4
-
 .tui.widget.k8s.topology.clear/%:
 	clear="--clear" ${make} .tui.widget.k8s.topology/${*}
 
@@ -1347,4 +1722,5 @@ k8s.commander/%:
 	label="${*} topology" \
 		${make} gum.style tux.require flux.loopfq/k8s.graph.tui/${*}/pod
 
+endif
 #░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░

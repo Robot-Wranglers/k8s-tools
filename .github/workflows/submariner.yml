@@ -20,6 +20,7 @@ jobs:
       - name: Initialize
         run: make clean init build
       - name: Run Multi-cluster Demo
-        run: ./demos/minikube.mk
+        run: ./demos/submariner.mk
         env:
-          COLUMNS: 150
+          # COLUMNS: 150
+          COLUMNS: 90

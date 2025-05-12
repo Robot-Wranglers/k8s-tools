@@ -1,0 +1,55 @@
+{% import 'macros.j2' as macros -%}
+
+## Kompose
+<hr style="width:100%;border-bottom:3px solid black;">
+
+{% include "includes/demo-common.md.j2" %}
+    
+This demo shows `kompose`[^1] workflows to translate docker-compose files to kubernetes manifests, plus interacting with the services from inside kubernetes and without kubernetes.  As with other demos, batteries are included and this automation comes with optional cluster lifecycle management. But it works with any other KUBECONFIG if you brought your own cluster.
+
+This setup is great for prototyping, since it's basically providing modular "local-first" development and cluster-backed deployments using the *same datastructure*. Your project might eventually grow to include docker registries, helm charts and repos, and dozens of files.. but all of that overhead is really awkward when you're just getting started.  
+
+The `kompose` tool converts docker-compose files directly to kubernetes manifests, based on a few hints in the labels and command-line arguments.  And our upstream automation framework *(i.e. `compose.mk`)* happens to specialize [in integrating with docker compose]({{mkdocs.site_relative_url}}/k8s.mk/#tool-container-basics) .
+
+Let's see if we can make a self-contained example that's easy to extend[^2].
+
+### Basic Usage
+<hr style="width:100%;border-bottom:3px solid black;">
+
+Running the demo is simple: 
+{#
+The following *(large)* image shows the full output of `./demos/cmk/kompose.cmk clean create build deploy test teardown`.  
+#}
+
+```bash {.cli_example}
+# Default entrypoint runs clean, create, 
+# deploy, test, but does not tear down the cluster. 
+$ ./demos/cmk/kompose.cmk
+```
+{{macros.img_link("kompose.png", mkdocs, "33%",class='cli_output')}}
+
+### Interactive Workflows
+<hr style="width:100%;border-bottom:3px solid black;">
+
+```bash {.cli_example}
+# End-to-end, again without teardown
+$ ./demos/cmk/kompose.cmk clean build create deploy test
+```
+
+
+
+#### Source Code
+<hr style="width:95%;border-bottom:1px dashed black;">
+
+The source code below uses containers from [the toolbox]({{mkdocs.site_relative_url}}/toolbox) and primitives from the [`k8s.mk` API]({{mkdocs.site_relative_url}}/k8s.mk).  Since `k8s.mk` is built on top of [compose.mk]({{jinja.vars.composemk_docs_url}}), you might want some of that background to completely understand the demo, but for the most part it should be pretty easy to read and adapt.
+
+{{macros.embed_demo(
+    'demos/cmk/kompose.cmk',
+    github=github)}}
+
+<hr style="width:100%;border-bottom:3px solid black;">
+
+[^1]: [https://submariner.io](https://submariner.io)
+[^2]: [https://docs.tigera.io](https://docs.tigera.io/)
+[^3]: [kubernetes multicluster with kind and submariner](https://piotrminkowski.com/2021/07/08/kubernetes-multicluster-with-kind-and-submariner/)
+[^4]: [minikube registry mirror setup](https://gist.github.com/trisberg/37c97b6cc53def9a3e38be6143786589)

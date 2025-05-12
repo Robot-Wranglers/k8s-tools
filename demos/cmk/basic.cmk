@@ -1,0 +1,21 @@
+#!/usr/bin/env -S ./k8s.mk mk.interpret!
+#░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+# demos/cmk/basic.cmk: 
+#   Demonstrating using k8s.mk as an interpreter.
+#
+# See the documentation here[1] for more discussion.
+# This demo ships with the `k8s-tools` repo and runs as part of the test-suite.
+#
+# REF:
+#   [1] https://robot-wranglers.github.io/k8s-tools/advanced-usage
+#░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+
+export KUBECONFIG:=./local.cluster.yml
+$(shell umask 066; touch ${KUBECONFIG})
+
+__main__:
+	$(call log.target, Using k8s.mk as an interpreter..)
+	$(call log.target, Checking if compose.mk library is available)
+	this.flux.ok
+	cmk.log.target(Checking if k8s.mk library is available)
+	this.k3d.stat

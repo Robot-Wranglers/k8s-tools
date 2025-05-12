@@ -1,0 +1,49 @@
+{% import 'macros.j2' as macros -%}
+
+## Object Storage with Minio
+<hr style="width:100%;border-bottom:3px solid black;">
+
+{% include "includes/demo-common.md.j2" %}
+
+Minio is great, checkout the official docs.[^1]  It provides S3-compatible object-storage without S3, so whether you're looking to emulate cloud stuff on your laptop, run stuff on-prem, or interested in multi-cloud.. it solves problems that you're pretty likely to run into at some point.  
+
+As just one example: mlflow, metaflow, flyte, and airflow *all* require an object-storage backend to some extent, even for pretty simple test-drive and prototyping workflows.
+
+This demo is just a quick start for minio itself, but is a good starting place for anything else that might require it.
+
+### Source Code
+<hr style="width:100%;border-bottom:3px solid black;">
+
+{{macros.embed_demo(
+    'demos/minio.mk', 
+    github=github)}}
+
+### Basic Usage
+<hr style="width:100%;border-bottom:3px solid black;">
+
+Cluster lifecycle looks more or less the same as any of the other demos.
+
+```bash {.cli_example}
+# Default entrypoint runs clean, create, 
+# deploy, test, but does not tear down the cluster. 
+$ ./demos/minio.mk clean create
+```
+
+
+```bash {.cli_example}
+# As part of `deploy`, `tilt up` will run.
+$ ./demos/minio.mk deploy
+
+# In this case, test just retrieves logs for tilt, 
+# then drops a link for web UI so you can test.
+$ ./demos/minio.mk test
+```
+
+```bash {.cli_example}
+# Stop the daemonizes tilt-server, tear down the cluster.
+$ ./demos/minio.mk minio.stop clean
+```
+
+<hr style="width:100%;border-bottom:3px solid black;">
+
+[^1]: [https://min.io/](https://min.io/)

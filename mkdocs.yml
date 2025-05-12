@@ -26,14 +26,8 @@ theme:
     - makefile
     - bash
     - json
-  # color_mode: dark
-  # user_color_mode_toggle: yes
   icon:
     repo: fontawesome/brands/git-alt
-  # icon:
-  #   admonition:
-  #     note: material/arrow-expand-down
-extra_css: ["extra.css"]
 site_url: https://robot-wranglers.github.io/k8s-tools
 site_description: >-
   Completely dockerized version of a kubernetes toolchain, plus a zero-dependency automation framework for extending and interacting it. Project-local clusters, cluster lifecycle automation, customizable TUIs, and more.
@@ -43,28 +37,40 @@ nav:
     - 'Quickstart': 'quickstart.md'
     - 'Toolbox & Manifest': 'toolbox.md'
     - 'Intro to Automation': 'k8s.mk.md'
+    - 'Intro to Clusters': clusters.md
     # - Features: 'features.md'
     # - Integration: 'integration.md'
   # - Core Components:
   #   - 'K8s-tools.yml': 'k8s-tools.yml.md'
   #   - 'K8s.mk': 'k8s.mk.md'
-  - API:
-    - 'Library Tour': 'lib.md'
-    - 'Full API': 'api.md'
-  - Stand Alone Mode:
-    - 'Tool Overview': 'tool-overview.md'
+  # - Stand Alone Mode:
+  #   - 'Tool Overview': 'tool-overview.md'
   - Demos:
     - 'Index of Demos': demos/index.md
-    - 'Cluster Lifecycle (k3d/prometheus)': demos/cluster-lifecycle.md
+    - 'Basic Cluster Lifecycle': demos/cluster-lifecycle.md
+    - 'Multi-Cluster Networking': demos/submariner.md
+    - 'Istio Traffic Management': demos/istio.md
     - 'Argo Workflows Example': demos/argo-wf.md
     - 'FaaS with Fission': demos/fission.md
-    - 'Multi-Cluster Networking (minikube/submariner)': demos/minikube.md
+    - 'Local-first with Kompose': demos/kompose.md
+    - 'Object Storage with Minio': demos/minio.md
+    - 'Tiltfiles, Embedded or External': demos/tilt.md
+    - 'Ansible, Embedded or External': demos/ansible.md
+    - 'Terraform, Embedded': demos/terraform.md
+    # - 'TUI Example': demos/tui.md
+    # - 'Bypassing registries with Buildah': demos/buildah.md
+  - Tool Mode:
+    - 'Overview': tool-mode.md
+    - 'Debugging with Kubetail': demos/kubetail.md
+  - API:
+    - 'Library Tour': 'lib.md'
+    - 'Idioms': 'idioms.md'
+    - 'Full API': 'api.md'
   - Other:
-    - 'Configuration / Env Vars': config.md
+    - 'Configuration ': config.md
     - limitations.md
     - contributing.md
     - 'Project Source': 'https://github.com/robot-wranglers/k8s-tools/'
-
 plugins:
   - search
   - autolinks
@@ -77,9 +83,10 @@ markdown_extensions:
   - footnotes 
   - admonition
   - pymdownx.details
+  - pymdownx.superfences
   - abbr
   - def_list
   - attr_list
+
 docs_dir: docs
 site_dir: site
-  

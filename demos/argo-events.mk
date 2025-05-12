@@ -39,14 +39,14 @@ export ARGO_WORKFLOWS_VERSION=3.5.4
 __main__: clean create deploy test
 
 # Generate target-scaffolding for k8s-tools.yml services
-$(eval $(call compose.import, k8s-tools.yml))
+$(call compose.import, file=k8s-tools.yml)
 
 # Cluster lifecycle basics.  These are the same for all demos, and mostly just
 # setting up aliases for existing targets.  The `*.pre` targets setup hooks 
 # for declaring stage-entry.. this is part of formatting friendly output.#░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
-clean.pre: flux.stage/cluster.clean
+clean.pre: stage/cluster.clean
 clean cluster.clean teardown: k3d.cluster.delete/$${CLUSTER_NAME}
-create.pre: flux.stage/cluster.create
+create.pre: stage/cluster.create
 create cluster.create: k3d.cluster.get_or_create/$${CLUSTER_NAME}
 wait cluster.wait: k8s.cluster.wait
 
@@ -65,9 +65,9 @@ define argo.events.manifests
 endef
 argo.manifest=https://github.com/argoproj/argo-workflows/releases/download/v${ARGO_WORKFLOWS_VERSION}/install.yaml
 
-deploy: argo.setup argo.events.setup k8s.wait
+deploy: argo.setup argo.events.setup wait
 	@# Note that this is not idempotent and fails on a second usage!
-	mapping="12000:12000" ${make} kubefwd.start/argo-events/webhook-eventsource-svc
+	kubefwd_mapping="12000:12000" ${make} kubefwd.start/argo-events/webhook-eventsource-svc
 
 argo.setup:; $(call containerized.maybe, k8s)
 .argo.setup: k8s.kubens.create/argo
@@ -77,8 +77,8 @@ argo.events.setup:; $(call containerized.maybe, k8s)
 .argo.events.setup: k8s.kubens.create/argo-events
 	${mk.def.read}/argo.events.manifests | ${io.xargs} "kubectl apply -f %"
 
-test:
+test: wait
 	curl -d '{"message":"this is my first webhook"}' \
 		-H "Content-Type: application/json" \
 		-X POST http://webhook-eventsource-svc:12000/example
-	${make} k8s.get/argo-events/workflows
+	kubectl get -n argo-events workflows -o json | ${stream.as.log}

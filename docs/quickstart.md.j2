@@ -1,26 +1,28 @@
 ## Quickstart
 <br/>
 
-### Basic Installation
+### Installation
 <hr style="width:100%;border-bottom:3px solid black;">
 
-Basic installation is just copying files and making them executable:
+The typical installation for the k8s-tools suite involves a few components, and is based on the assumption that you probably want to *embed and potentially modify the pieces* inside some existing project you've already started.  In other words: **fork and forget**.  
 
-```bash
+So basic installation is just copying files and making them executable:
+
+```bash {.cli_example}
 $ cd myproject 
 
 # Download compose.mk, k8s.mk, and k8s-tools.yml
 $ curl -sLo compose.mk \
-  https://raw.githubusercontent.com/Robot-Wranglers/k8s-tools/master/compose.mk
+    https://raw.githubusercontent.com/Robot-Wranglers/k8s-tools/master/compose.mk
 $ curl -sLo k8s.mk \
-  https://raw.githubusercontent.com/Robot-Wranglers/k8s-tools/master/k8s.mk \
+    https://raw.githubusercontent.com/Robot-Wranglers/k8s-tools/master/k8s.mk
 $ curl -sLo k8s-tools.yml \
-  https://raw.githubusercontent.com/Robot-Wranglers/k8s-tools/master/k8s-tools.yml \
+    https://raw.githubusercontent.com/Robot-Wranglers/k8s-tools/master/k8s-tools.yml
 
 # Make scripts executable
 $ chmod +x compose.mk k8s.mk k8s-tools.yml
 
-# Now equivalent to `make -f compose.mk ...`
+# Now equivalent to `make -f ...`
 $ ./compose.mk ...
 $ ./k8s.mk ...
 
@@ -28,103 +30,74 @@ $ ./k8s.mk ...
 $ ./k8s-tools.yml ...
 ```
 
-Local clusters with lots of containers might require increasing the OS limits for open-files.  See [the kind docs](https://kind.sigs.k8s.io/docs/user/known-issues#pod-errors-due-to-too-many-open-files) for hints about increasing this value.
+That's it, and at this point you can already do lots of stuff by using `k8s.mk` in [tool mode]({{mkdocs.site_relative_url}}/tool-mode).  With the fork-and-forget approach, you can also strip containers you know that you'll never use from [the toolbox]({{mkdocs.site_relative_url}}/toolbox), and add new ones.
 
-That's it for basic installation, and at this point you can do lots of stuff by using `k8s.mk` in stand-alone mode.  Read on for tighter project integration, library usage, and scripting.
+Read on for info about tighter project integration, library usage, and scripting.
+
+### Single File
+<hr style="width:100%;border-bottom:3px solid black;">
+
+!!! warning "Experimental"
+    Bundling for the single-file installation works fine for simple things, but isn't exercised yet by automated tests, and some advanced features of `compose.mk` might unavailable.
+
+If you want fewer files, already know that you're not interested in extending `k8s.mk` or adjusting details for [the tool-containers]({{mkdocs.site_relative_url}}/toolbox), you can opt instead for the **monolithic install** that bundles all 3 files together.
+
+```bash {.cli_example}
+$ cd myproject 
+
+# Download compose.mk, k8s.mk, and k8s-tools.yml
+$ curl -sLo compose.mk \
+    https://raw.githubusercontent.com/Robot-Wranglers/k8s-tools/master/k8s
+$ chmod +x ./k8s
+
+# Alternatively, generate `k8s` omnibus from existing files:
+$ bin=./k8s ./compose.mk mk.fork/k8s.mk,k8s-tools.yml
+```
+
+For more background and details building bundles from scratch, see [the upstream docs]({{jinja.vars.composemk_docs_url}}/standard-lib/#forks-guests-and-payloads).
+
 
 ### Project Integration
 <hr style="width:100%;border-bottom:3px solid black;">
 
-In your project Makefile:
+For [library usage]({{mkdocs.site_relative_url}}/lib) from your project automation and for orchestrating stuff in [the toolbox]({{mkdocs.site_relative_url}}/toolbox), you'll want something like this inside your project Makefile:
 
-```Makefile
-# Include the `k8s.mk` library.  
-# This implicitly includes `compose.mk`
+```Makefile {.language-makefile .snippet}
+# Include the `k8s.mk` library
 include k8s.mk
 
-# generate target scaffolding for the tool containers
-$(eval $(call compose.import, k8s-tools.yml))
+# Generate target scaffolding for the tool containers
+$(call compose.import, file=k8s-tools.yml)
 ```
+
+For the [monolithic install](#single-file), the `compose.import` is implied, so just use `include k8s`.
+
+### Local Clusters
+<hr style="width:100%;border-bottom:3px solid black;">
+
+!!! tip Note 
+    Local clusters with lots of containers might require increasing the OS limits for open-files.  See [the kind docs](https://kind.sigs.k8s.io/docs/user/known-issues#pod-errors-due-to-too-many-open-files) for hints about increasing this value.
+
+Using local clusters isn't required, but it is a typical use-case and one thing that `k8s.mk` specializes in.  Besides the caveat for open-files, this requires no additional setup and has no extra dependencies.  For an overview, see the [intro to local clusters]({{mkdocs.site_relative_url}}/local-clusters), and for an example you can [pick a random demo]({{mkdocs.site_relative_url}}/demos) since most will involve some kind of cluster-lifecycle management.
 
 ### For Developers
 <hr style="width:100%;border-bottom:3px solid black;">
 
-To run demos yourself, you'll want to clone the repository.
+To run demos yourself, clone the repository.
 
-```bash
-# for ssh
+```bash {.cli_example}
+# For ssh
 $ git clone git@github.com:Robot-Wranglers/k8s-tools.git
 
-# or for http
+# Or for http
 $ git clone https://github.com/Robot-Wranglers/k8s-tools.git
 
-# pre-cache the containers
+# Pre-cache for main containers
 $ make build 
 
-# run all the demos
+# Run all the demos
 $ make demos
+
+# Run only CMK-lang demos
+$ make demos/cmk
 ```
-<br/>
-
-
-{#
-You'll probably want to read over the [compose.mk]({{mkdocs.site_relative_url}}/compose.mk) section to really understand what's going on here.  In case you've already seen it though, here's the quick start with the copy/paste stuff.
-
-First, copy the files from this repo into your project:
-
-```bash
-$ cd myproject 
-
-# Download the compose file with the tool containers
-$ curl -sL \
-  {{github.raw_url}}/master/k8s-tools.yml \
-    > k8s-tools.yml
-
-# Download the compose.mk automation lib
-$ curl -sL \
-  {{github.raw_url}}/master/compose.mk \
-    > compose.mk
-
-# Download the k8s.mk automation lib.
-$ curl -sL \
-  {{github.raw_url}}/master/k8s.mk \
-    > k8s.mk
-
-```
-
-These 3 files are usually working together, but in some cases they are useful in a stand-alone mode.  Make them all executable like this:
-
-```bash
-$ chmod ugo+x k8s-tools.yml compose.mk k8s.mk
-
-# equivalent to `make -f k8s.mk ..`
-./k8s.mk ... 
-
-# equivalent to `make -f compose.mk ..`
-$ ./compose.mk ... 
-
-# equivalent to `docker compose -f k8s-tools.yml run ...`
-$ ./k8s-tools.yml run ...
-```
-
-That's all the setup you'll need just for using tools directly.  See the next section for more information/examples re: stand-alone mode.
-
-If you're interested in tighter integration like setting up the [Make/Compose bridge]({{mkdocs.site_relative_url}}/compose.mk#makecompose-bridge) or preparing for [Container Dispatch]({{mkdocs.site_relative_url}}/compose.mk#container-dispatch), here's a quick example of what your project Makefile should look like:
-
-```Makefile
-# myproject/Makefile (Make sure you have real tabs, not spaces!)
- 
-# Include/invoke the target-building macros 
-# somewhere near the top of your existing boilerplate
-include compose.mk
-$(eval $(call compose.import, ▰, TRUE, k8s-tools.yml))
-
-# At this point, targets are defined for whatever services
-# are mentioned in the external compose config, and they are
-# ready to use. Now you can dispatch any task to any container!
-test: ▰/k8s/self.test
-self.test:
-  kubectl --version
-  echo hello world from `uname -n -v`
-```
-#}

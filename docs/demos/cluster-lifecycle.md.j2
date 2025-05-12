@@ -3,23 +3,33 @@
 ## Cluster Lifecycle Demo
 <hr style="width:100%;border-bottom:3px solid black;">
 
-The cluster lifecycle demo shows an example of a project-local kubernetes cluster.  It's managed via [`k8s.mk`]({{mkdocs.site_relative_url}}), which is orchestrating usage of several different tools like `k3d`, `kubectl`, `helm`, and `ansible` to install things like Prometheus and Grafana.  See also the official docs for the [kube-prom stack](https://artifacthub.io/packages/helm/prometheus-community/kube-prometheus-stack).
+{% include "includes/demo-common.md.j2" %}
 
-There are no host dependencies at all except for `make` and `docker`, and the entire thing runs locally or even [inside of github actions]({{github.actions_url}}/cluster-lifecycle.yml).  Since `k8s.mk` is built on top of [compose.mk]({{jinja.vars.composemk_docs_url}}), you might want some of that background to completely understand the automation's implementation, but for the most part it should be pretty easy to read and adapt.  Jump to the [demo source code](#source-code) if you want to skip the rest of the discussion.  
+This demo shows an example of a project-local kubernetes cluster lifecycle.  It orchestrates usage of several items [from the toolbox]({{mkdocs.site_relative_url}}/toolbox) such as `k3d`, `kubectl`, `helm`, `ansible`, and `promtool` to install and exercise things like Prometheus and Grafana.  See also the [overview of demos]({{mkdocs.site_relative_url}}/demos/) for information about k8s-tools demos in general, and see also the official docs for the kube-prom stack[^1].
 
-The rest of this page is structured as follows.  [Basic Usage](#basic-usage) is up first, then [a (big) screenshot of end to end execution](#end-to-end-output).  After that we walk through some [other more interactive workflows](#interactive-workflows), and cap it off with the [demo source code](#source-code) in the appendix.  The source is also available from the repository, see {{macros.repo_link('demos/cluster-lifecycle.mk', github)}}.
+{#
+!!! road_map "Road Map"
+    1. [Basic Usage](#basic-usage) is up first, then [a (big) screenshot of end to end execution](#end-to-end-output).  After that we walk through some [other more interactive workflows](#interactive-workflows), and cap it off with the [demo source code](#source-code) in the appendix.  The source is also available from the repository, see {{macros.repo_link('demos/cluster-lifecycle.mk', github=github)}}.
+#}
 
 ### Basic Usage
 <hr style="width:100%;border-bottom:3px solid black;">
 
 Running the demo is simple: 
 
-```bash 
-
+```bash {.cli_example}
 # Default entrypoint runs clean, create, 
 # deploy, test, but does not tear down the cluster.  
 $ ./demos/cluster-lifecycle.mk
+```
+{{macros.img_link("cluster-lifecycle.png", mkdocs, "33%",class='cli_output')}}
 
+One particularly interesting feature you can see above is the *graphical preview* of pod/sevice topologies from various namespaces.  Topology previews are console-friendly and also work from CI/CD like github-actions.  This allows you to **visually parse the results of complex orchestration** very quickly.  At this high level of detail you won't be able tell specifics, but it's pretty useful for showing whether results have changed.
+
+### Interactive Workflows
+<hr style="width:100%;border-bottom:3px solid black;">
+
+```bash {.cli_example}
 # End-to-end, again without teardown
 $ ./demos/cluster-lifecycle.mk clean create deploy test
 
@@ -29,35 +39,24 @@ $ ./demos/cluster-lifecycle.mk cluster.shell
 # Finally, teardown the cluster
 $ ./demos/cluster-lifecycle.mk teardown
 ```
+```bash {.cli_output}
+..
+```
 
-See the [interactive workflows](#interactive-workflows) for more details.
-
-### End-to-End Output
-<hr style="width:100%;border-bottom:3px solid black;">
-
-The following *(large)* image shows the full output of `./demos/cluster-lifecycle.mk clean create deploy test teardown` so you can get a feel for what output looks like.
-
-{{macros.img_link("cluster-lifecycle.png", mkdocs, "33%")}}
-
-One particularly interesting feature you can see above is the *graphical preview* of pod/sevice topologies from various namespaces.  Topology previews are console-friendly and also work from CI/CD like github-actions.  This allows you to **visually parse the results of complex orchestration** very quickly.  At this high level of detail you won't be able tell specifics, but it's pretty useful for showing whether results have changed.
-
-### Interactive Workflows
-<hr style="width:100%;border-bottom:3px solid black;">
-
-Grafana and Prometheus were already installed via the `deploy.grafana` target, which already ran as a prerequisite for the main `deploy` target.  This setup also includes prometheus, and uses [the standard charts](https://github.com/prometheus-community/helm-charts).  But so far we haven't exercised or interacted with the installation.  Let's take a look at the common interactive cluster workflows.  
+Grafana and Prometheus were already installed via the `deploy.grafana` target, which runs as a prerequisite for the main `deploy` target.  This setup also includes prometheus, and uses the standard charts[^1].  But so far we haven't exercised or interacted with the installation.  Let's take a look at the common interactive cluster workflows.  
 
 It's a good idea to start with usage of `cluster.wait`, which is just an alias for the {{macros.api_link('k8s.wait', mkdocs)}} target, and ensures that all pods are ready.  This isn't *strictly* necessary since the automation does it already, but it's a good reminder that the [whole internal API for k8s.mk]({{mkdocs.site_relative_url}}/api) is automatically available as a CLI.
 
-```bash 
-
+```bash {.cli_example}
 $ ./demos/cluster-lifecycle.mk cluster.wait
-
+```
+```bash {.cli_output}
 .. lots of output ..
 ```
 
 See the [demo source](#source-code) for the implementation of `deploy.grafana`. It's not too surprising, but as usual, we interact with `helm` without installing it explicitly, without assuming that it's installed, and without writing `docker run ...` everywhere.  
 
-One interesting thing about the approach taken with `deploy.grafana` allows for custom helm-values *without* an external file, and also without a ton of awkward CLI overrides, by just inlining a small file that would normally cause a lot of annoying context switching.
+One interesting thing about the approach taken with `deploy.grafana` is that it allows for custom helm-values *without* an external file, and also without a ton of awkward CLI overrides, by just inlining a small file that would normally cause a lot of annoying context switching. See `grafana.helm.values`.
 
 #### Port Forwarding
 <hr style="width:95%;border-bottom:1px dashed black;">
@@ -66,9 +65,10 @@ Let's use `kubefwd` to setup port-forwarding to actually look at grafana.  Since
 
 Using `kubefwd` is nicer than `kubectl port-forward` in that you should actually get working DNS.  Using [kubefwd via `k8s.mk`]({{mkdocs.site_relative_url}}/api/#api-kubefwd) has the added benefits that it handles aspects of setup / shutdown automatically to make it more idempotent.  *(Hence the `docker.stop` stuff at the beginning of the logs below.)*
 
-Running `./demos/cluster-lifecycle.mk fwd.grafana` looks like this:
-
-```text
+```bash {.cli_example}
+$ ./demos/cluster-lifecycle.mk fwd.grafana
+```
+```markdown {.cli_output}
 ≣ docker.stop // kubefwd.k8s-tools.prometheus.grafana 
 ≣ docker.stop // No containers found 
 ⑆ kubefwd // prometheus // grafana 
@@ -104,15 +104,17 @@ As advertised in the output above, the forwarding should work as advertised **ou
 
 -----------------------------------------
 
-Tests that exercise the Grafana API tests haven't been run yet, because testing services from *inside* the cluster isn't ideal.  Testing from outside is better, but does require `curl` on the docker host.  
+Tests that exercise the Grafana API tests haven't been run yet, because testing services from *inside* the cluster isn't ideal.  Testing from outside like this is better, but does require `curl` on the docker host.  
 
 Running tests looks like this:
 
-```bash 
+```bash {.cli_example}
 $ ./demos/cluster-lifecycle.mk test.grafana
+```
+```bash {.cli_output}
 
 ⇄ Testing Grafana API 
-{"message":"Logged in","redirectUrl":"/"}  {
+{
     "id": 25,
     "uid": "b0a9d1f2-6150-4b49-b82c-7267af628ce7",
     "orgId": 1,
@@ -121,16 +123,15 @@ $ ./demos/cluster-lifecycle.mk test.grafana
     "url": "/d/b0a9d1f2-6150-4b49-b82c-7267af628ce7/prometheus-overview",
     "slug": "",
     "type": "dash-db",
-    "tags": [
-      "prometheus-mixin"
-    ],
+    "tags": ["prometheus-mixin"],
     "isStarred": false,
     "sortMeta": 0,
     "isDeleted": false
   }
 ```
-<br/>
 
+
+{#
 #### Shelling In
 <hr style="width:95%;border-bottom:1px dashed black;">
 
@@ -160,21 +161,28 @@ So under the hood `cluster.shell` uses {{macros.api_link('k8s.wait', mkdocs)}} t
 Of course, the `cluster.shell` and test-harness stuff in the project coder are just helpers for convenience. You can directly use the CLI API:
 
 ```bash 
-
 # Shell into an existing pod, given namespace and pod-name
 $ ./demos/cluster-lifecycle.mk k8s.pod.shell/default/test-harness
 
 # Start a new pod with the given name, in the given namespace,  
 # then shell into it when it's finished bootstrapping.
-$ interactive=1 ./demos/kaniko.mk k8s.test_harness/default/mypod
+$ interactive=1 ./demos/cluster-lifecycle.mk k8s.test_harness/default/mypod
 
 # Like last command, but overrides the default pod image
 $ interactive=1 img=python:3.11-slim-bookworm \
-    ./demos/kaniko.mk k8s.test_harness/default/mypod
+    ./demos/cluster-lifecycle.mk k8s.test_harness/default/mypod
 ```
-
 <br/>
+#}
 
+{#
+See the [interactive workflows](#interactive-workflows) for more details.
+
+### End-to-End Output
+<hr style="width:100%;border-bottom:3px solid black;">
+
+The following *(large)* image shows the full output of `./demos/cluster-lifecycle.mk clean create deploy test teardown` so you can get a feel for what output looks like.
+#}
 ### Batteries Included, Room to Grow
 <hr style="width:100%;border-bottom:3px solid black;">
 
@@ -186,7 +194,7 @@ Here'few random examples of other stuff that `./demos/cluster-lifecycle.mk` can 
 
 Via k8s.mk API:
 
-```bash
+```bash {.cli_example}
 # Show all pods 
 $ ./demos/cluster-lifecycle.mk k8s.pods
 
@@ -205,7 +213,7 @@ $ ./demos/cluster-lifecycle.mk k3d.stat
 
 Via compose.mk API:
 
-```bash
+```bash {.cli_example}
 # Version info for docker and docker compose
 $ ./demos/cluster-lifecycle.mk docker.stat
 
@@ -233,12 +241,10 @@ At the same time, we accomplished some very useful decoupling.  This automation 
 ### Source Code 
 <hr style="width:100%;border-bottom:3px solid black;">
 
-```Makefile
-{{open('demos/cluster-lifecycle.mk','r').read().strip()}}
-```
+{{macros.embed_demo(
+    'demos/cluster-lifecycle.mk', 
+    github=github)}}
 
 <hr style="width:100%;border-bottom:3px solid black;">
 
-{#
-<hr style="width:95%;border-bottom:1px dashed black;">
-#}
+[^1]: [kube-prometheus-stack](https://artifacthub.io/packages/helm/prometheus-community/kube-prometheus-stack)

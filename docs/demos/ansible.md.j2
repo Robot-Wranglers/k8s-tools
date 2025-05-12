@@ -1,0 +1,89 @@
+{% import 'macros.j2' as macros -%}
+
+## Working with Ansible
+<hr style="width:100%;border-bottom:3px solid black;">
+
+{% include "includes/demo-common.md.j2" %}
+
+This section documents several different ways to use ansible in one place.
+
+If you are curious to see a tutorial-style introduction to the actual implementation of ansible in `k8s.mk`, see also [this part of the `compose.mk` docs]({{jinja.vars.composemk_docs_url}}/demos/custom-automation-apis), but you won't need that background to follow these examples.
+
+### Source Code
+<hr style="width:100%;border-bottom:3px solid black;">
+
+#### Ad-hoc Mode 
+<hr style="width:95%;border-bottom:1px dashed black;">
+
+The simplest way to work with ansible is using the adhoc-mode, which we have seen before in [the cluster lifecycle demo]({{mkdocs.site_relative_url}}/demos/cluster-lifecycle).  After finding [some useful ansible module](https://docs.ansible.com/ansible/2.9/modules/modules_by_category.html), probably something inside the [kubernetes core collection](https://docs.ansible.com/ansible/latest/collections/kubernetes/core/index.html#modules), then you can just call it.
+
+From a project makefile, it looks something like this:
+
+```Makefile {.snippet}
+...
+
+deploy.helm:
+	${jb} name=ahoy \
+		chart_ref=hello-world \
+		release_namespace=default \
+		chart_repo_url="https://helm.github.io/examples" \
+	| ${make} ansible.helm 
+
+...
+```
+
+In the above example, `jb` constructs json in the way you'd expect, and the result is passed to ansible.  From console you can do basically the same thing like this:
+
+```bash {.cli_example}
+$ ./k8s.mk jb name=ahoy \
+		chart_ref=hello-world \
+		release_namespace=default \
+		chart_repo_url="https://helm.github.io/examples" \
+	| KUBECONFIG=./my-kubeconfig ./k8s.mk ansible.helm
+```
+```raw {.cli_output}
+{ .. json .. }
+```
+
+#### Task-Lists
+<hr style="width:95%;border-bottom:1px dashed black;">
+
+Another option is to describe partial playbooks, i.e. inlined task-lists without the hassle of inventories or the rest of the playbook config context.
+
+{{macros.embed_demo(
+    'demos/ansible.mk', 
+    github=github)}}
+
+### Interactive Workflows
+<hr style="width:100%;border-bottom:3px solid black;">
+
+{#
+### Basic Usage
+<hr style="width:100%;border-bottom:3px solid black;">
+
+Cluster lifecycle looks more or less the same as any of the other demos.
+
+```bash {.cli_example}
+# Default entrypoint runs clean, create, 
+# deploy, test, but does not tear down the cluster. 
+$ ./demos/ansible.mk clean create
+```
+
+```bash {.cli_example}
+# As part of `deploy`, `tilt up` will run.
+$ ./demos/ansible.mk deploy
+
+# In this case, test just retrieves logs for tilt, 
+# then drops a link for web UI so you can test.
+$ ./demos/ansible.mk test
+```
+
+```bash {.cli_example}
+# Stop the daemonizes tilt-server, tear down the cluster.
+$ ./demos/ansible.mk minio.stop clean
+```
+#}
+
+<hr style="width:100%;border-bottom:3px solid black;">
+
+[^1]: [https://min.io/](https://https://min.io/)

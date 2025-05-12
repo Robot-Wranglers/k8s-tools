@@ -3,51 +3,57 @@
 ## FaaS with Fission
 <hr style="width:100%;border-bottom:3px solid black;">
 
-This demo shows an example of a project-local kubernetes cluster that bootstraps [Argo Workflows](#), then exercises workflows by dispatching them, reading logs, etc.  It's managed via [`k8s.mk`]({{mkdocs.site_relative_url}}/k8s.mk), which is orchestrating usage of several different tools like `k3d`, `kubectl`, `helm`, and `fission`.
+{% include "includes/demo-common.md.j2" %}
+    
+{#This demo shows an example of a project-local kubernetes cluster that bootstraps [Argo Workflows](#), then exercises workflows by dispatching them, reading logs, etc.  It's managed via [`k8s.mk`]({{mkdocs.site_relative_url}}/k8s.mk), which is orchestrating usage of several different tools like `k3d`, `kubectl`, `helm`, and `fission`.
 
 There are no host dependencies at all except for `make` and `docker`, and the entire thing runs locally or [inside of github actions]({{github.actions_url}}/fission.yml).
 
 Since `k8s.mk` is built on top of [compose.mk]({{jinja.vars.composemk_docs_url}}), you'll want some of that background to completely understand the [demo code](#source-code), but for the most part it should be pretty easy to read and adapt.
 
----------------
+!!! road_map "Road Map"
+#}
 
-The rest of this page is structured as follows.  [Basic Usage](#basic-usage) is up first, then [a (big) screenshot of end to end execution](#end-to-end-output).  After that we walk through some [other more interactive workflows](#interactive-workflows), and cap it off with the [inlined demo source code](#source-code).  The source is also available from the repository, see {{macros.repo_link('demos/cluster-lifecycle.mk', github)}}.
+The rest of this page is structured as follows.  [Basic Usage](#basic-usage) is up first, then [a (big) screenshot of end to end execution](#basic-usage).  After that we walk through some [other more interactive workflows](#interactive-workflows), and finally, the [inlined demo source code](#source-code).  
+
+{#The source is also available from the repository, see {{macros.repo_link('demos/cluster-lifecycle.mk', github)}}.#}
 
 ### Basic Usage
 <hr style="width:100%;border-bottom:3px solid black;">
 
 Running the demo is simple: 
 
-```bash 
-
-# Default entrypoint runs clean, create, deploy, test, but does not tear down the cluster.  
+```bash {.cli_example}
+# Default entrypoint runs cluster clean, 
+# create, deploy, test but no cluster tear down
 $ ./demos/fission.mk
-
-# End-to-end, again without teardown 
-$ ./demos/fission.mk clean create deploy test
-
-# Finally, teardown the cluster
-$ ./demos/fission.mk teardown
 ```
-
-### End-to-End Output
-<hr style="width:100%;border-bottom:3px solid black;">
-
-Placeholder 
-
-{{macros.img_link("fission.png", mkdocs, "33%")}}
+{{macros.img_link(
+    "fission.png", mkdocs, 
+    "44%",class='cli_output')}}
 
 ### Interactive Workflows
 <hr style="width:100%;border-bottom:3px solid black;">
 
-Placeholder
+Besides the main entrypoint, you can do things piecewise during development:
+
+```bash {.cli_example}
+
+# Use explicit stages for retrying piecewise 
+$ ./demos/fission.mk clean create deploy test
+
+# Drop into debugging shell for `fission` container
+$ ./demos/fission.mk shell
+
+# Finally, teardown the cluster
+$ ./demos/fission.mk clean
+```
 
 ### Source Code 
 <hr style="width:100%;border-bottom:3px solid black;">
 
-```Makefile
-{{open('demos/fission.mk','r').read().strip()}}
-```
+{{macros.embed_demo(
+    'demos/fission.mk', github=github)}}
 
 
 <hr style="width:100%;border-bottom:3px solid black;">
