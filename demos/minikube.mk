@@ -74,9 +74,14 @@ create cluster.create: flux.stage/cluster.create k8s.dispatch/.create
 		--extra-config=kubeadm.pod-network-cidr=${west.pod_cidr} \
 	&& docker network connect east west 
 
-deploy: flux.stage/deploy k8s.dispatch/.deploy/east k8s.dispatch/.deploy/west
-.deploy/%:
-	$(call log.k8s,Configuring clusters..)
+deploy: \
+	flux.stage/deploy \
+	k8s.dispatch/networking/east \
+	k8s.dispatch/networking/west \
+	subctl.dispatch/clusters.join
+
+networking/%:
+	$(call log.k8s,Configuring cluster ${bold} ${*})
 	set -x \
 	&& (\
 		kubectl create -f ${calico.url} --context ${*} \
@@ -90,11 +95,14 @@ deploy: flux.stage/deploy k8s.dispatch/.deploy/east k8s.dispatch/.deploy/west
 	&& kubectl patch ippool default-ipv4-ippool \
 		--context ${*} --type=merge \
 		-p '{"spec": {"ipipMode": "Never", "vxlanMode": "Always"}}'
-.deploy/%: 
+
+clusters.join: 
+	$(call log.k8s,Joining clusters together..)
 	subctl deploy-broker --context east
 	${make} io.wait/30 
 	subctl show brokers --context east
 	subctl join broker-info.subm --natt=false --clusterid east --context east
+	${make} io.wait/30 
 	subctl join broker-info.subm --natt=false --clusterid west --context west
 	${make} io.wait/30 
 
