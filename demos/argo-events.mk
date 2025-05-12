@@ -44,9 +44,9 @@ $(eval $(call compose.import, k8s-tools.yml))
 # Cluster lifecycle basics.  These are the same for all demos, and mostly just
 # setting up aliases for existing targets.  The `*.pre` targets setup hooks 
 # for declaring stage-entry.. this is part of formatting friendly output.#░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
-clean.pre: flux.stage/cluster.clean
+clean.pre: stage/cluster.clean
 clean cluster.clean teardown: k3d.cluster.delete/$${CLUSTER_NAME}
-create.pre: flux.stage/cluster.create
+create.pre: stage/cluster.create
 create cluster.create: k3d.cluster.get_or_create/$${CLUSTER_NAME}
 wait cluster.wait: k8s.cluster.wait
 

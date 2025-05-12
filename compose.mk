@@ -86,8 +86,7 @@ esac \
 ##
 ##░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 SHELL:=bash
-MAKEFLAGS:=-s -S --warn-undefined-variables
-MAKEFLAGS+=--no-builtin-rules --no-print-directory
+MAKEFLAGS:=-s -S --warn-undefined-variables --no-builtin-rules
 .SUFFIXES:
 .INTERMEDIATE: .tmp.* .flux.*
 export TERM?=xterm-256color
@@ -236,7 +235,7 @@ log.trace.part2=[ "${TRACE}" == "0" ] && true || $(call log.part2, ${1})
 log.target.rerouting=$(call log, ${dim}${_GLYPH_IO}${dim} $(shell echo ${@}|sed 's/\/.*//') ${sep}${dim} Invoked from top; rerouting to tool-container)
 log.trace.target.rerouting=( [ "${TRACE}" == "0" ] && true || $(call log.target.rerouting) )
 log.file.contents=([ "$${quiet:-0}" == "1" ] || printf "`printf "${1}"|${stream.lstrip}` ${dim}`cat ${2}`${no_ansi}\n" > /dev/stderr) 
-log.file.preview=$(call log.target, ${cyan_flow_left}) ; $(call io.preview.file, ${1})
+log.file.preview=$(call log.target, ${cyan}$(strip ${1})) ; $(call io.preview.file, ${1})
 
 log.docker=$(call log, ${GLYPH.DOCKER} ${1})
 log.flux=$(call log, ${GLYPH.FLUX} ${1})
@@ -462,8 +461,8 @@ compose.loadf: tux.require
 	&& fname=`printf "$${words}" | sed 's/ /\n/g' | tail -n +2 | head -1` \
 	&& words=`printf "$${words}" | sed 's/ /\n/g' | tail -n +3 | xargs` \
 	&& cmd_disp="${dim_cyan}$${words:-(No commands given.  Defaulting to opening UI..)}${no_ansi}" \
-	&& header="${GLYPH_IO} loadf ${sep} ${dim_green}${underline}$${fname}${no_ansi} ${sep}" \
-	&& $(call log, $${header} $${cmd_disp}) \
+	&& header="loadf ${sep} ${dim_green}${underline}$${fname}${no_ansi} ${sep}" \
+	&& $(call log.io, $${header} $${cmd_disp}) \
 	&& ls $${fname} > ${devnull} || (printf "No such file"; exit 1) \
 	&& tmpf=./.tmp.mk \
 	&& stem=`${make} compose.get.stem/$${fname}` \
@@ -487,7 +486,7 @@ compose.loadf: tux.require
 		| head -5 | xargs -I% printf "% " \
 		| sed 's/ /,/g' | sed 's/,$$//'` \
 	&& msg=`[ -z "$${words:-}" ] && echo 'Starting TUI' || echo "Starting downstream targets"` \
-	&& $(call log, $${header} ${dim}$${msg}) \
+	&& $(call log.io, $${header} ${dim}$${msg}) \
 	&& ${trace_maybe} \
 	&& $(call log.trace, $${header} Handing off to generated makefile) \
 	&& $(call mk.yield, env -i HOME=${HOME} make ${MAKE_FLAGS} -f $${tmpf} $${words:-tux.open.service_shells/$${first}})
@@ -2496,7 +2495,7 @@ flux.apply.later/% flux.delay/%:
 
 flux.apply.later.sh/%:
 	@# Applies the given command at some point in the future.  This is non-blocking.
-	@# Not pipe-safe, because since targets run in the background, this can garble your display!
+	@# Not pipe-safe since targets run in the background, this can garble your display!
 	@#
 	@# USAGE:
 	@#   cmd="..." ./compose.mk flux.apply.later.sh/<seconds>
@@ -2509,6 +2508,9 @@ flux.apply.later.sh/%:
 		&& ${make} io.wait/$${time} \
 		&& $(call log.flux, $${header} ${dim}callback triggered after ${yellow}$${time}s) && $${cmd:-true} \
 	)&
+
+flux.column/%:; delim=':' ${make} flux.pipeline/${*}
+	@# Exactly flux.pipeline, but splits targets on colons.
 
 flux.do.when/%:
 	@# Runs the 1st given target iff the 2nd target is successful.
@@ -2539,7 +2541,8 @@ flux.do.unless/%:
 flux.pipe.fork=${make} flux.pipe.fork
 flux.pipe.fork flux.split:
 	@# Demultiplex / fan-out operator that sends stdin to each of the named targets in parallel.
-	@# (This is like `flux.sh.tee` but works with make-target names instead of shell commands)
+	@# This is like `flux.sh.tee` but works with make-target names instead of shell commands.
+	@# Also available as a macro.
 	@#
 	@# USAGE: (pipes the same input to target1 and target2)
 	@#   echo {} | targets="jq,jq" ./compose.mk flux.pipe.fork 
@@ -2738,23 +2741,23 @@ flux.loop.until/%:
 	&& $(call log, $${header} ${no_ansi_dim}(succeeded after ${no_ansi}${yellow}$${delta}s${no_ansi_dim}))
 
 flux.loop.watch/%:
-	@# Loops the given target forever, using 'watch' instead of the while-loop default
-	@#
-	watch \
-		--interval $${interval:-2} \
-		--color ${make} ${*}
+	@# Loops the given target forever, using `watch` instead of the while-loop default.
+	@# This requires `watch` is actually available.
+	watch --interval $${interval:-2} --color ${make} ${*}
 
 flux.map/%:
-	@# Similar to `flux.each`, but maps input stream sequentially onto the comma-delimited target list.
-	@# Whereas `flux.each` expects unary targets, targets provided here *must* accept streaming input.
+	@# Maps the given target over the given inputs.
+	@# All inputs are comma-separated.  Given target 
+	@# must unary and arguments must be words (no spaces)
 	@#
 	@# USAGE:
-	@#   echo hello-world | ./compose.mk flux.map/stream.echo,stream.echo
-	@#
-	$(call io.mktemp) && \
-	${stream.stdin} > $${tmpf} \
-	&& printf ${*} | sed 's/,/\n/g' | xargs -I% printf 'cat $${tmpf} | ${make} %\n' \
-	| bash -x
+	@#   ./compose.mk flux.map/flux.echo,foo,bar
+	target=`printf "${*}" | cut -d, -f1` \
+	&& inputs=`printf "${*}" | cut -d, -f2-` \
+	&& $(call log.flux, flux.map ${sep} ${no_ansi}$${target} ${sep} ${dim}$${inputs}) \
+	&& printf "$${inputs}" \
+	| ${stream.comma.to.nl} \
+	| xargs -I% sh ${dash_x_maybe} -c "${make} $${target}/% || exit 255" 
 
 flux.or/%:
 	@# Performs an 'or' operation with the named comma-delimited targets.
@@ -2771,14 +2774,11 @@ flux.or/%:
 	| xargs -I% echo "|| ${make} %" | xargs | sed 's/^||//' \
 	| bash
 
-flux.column/%:; delim=':' ${make} flux.pipeline/${*}
-	@# Exactly flux.pipeline, but splits targets on colons.
-
 flux.parallel/%:
 	@# Runs the named targets in parallel, using make's builtin support for concurrency.
 	@#
-	@# Similar to `flux.join`, but using `make --jobs`, this is fundamentally much more
-	@# tricky to handle than `flux.join`, but also in some ways will allows for 
+	@# Similar to `flux.join` but using `make --jobs`, this is fundamentally much more
+	@# tricky to handle than `flux.join`, but also in some ways will allow for 
 	@# finer-grained control.  It probably doesn't work the way you think, because
 	@# concurrency may affect *more* than the top level targets that are named as 
 	@# arguments.  See [1] for more documentation about that.
@@ -2786,7 +2786,6 @@ flux.parallel/%:
 	@# See the `flux.join` docs for some hints about running concurrently but safely 
 	@# producing structured output.  Major caveat: input streams [2] probably cannot be 
 	@# easily or safely used with `flux.parallel`. 
-	@# 
 	@#
 	@# REFS: 
 	@#  [1] https://www.gnu.org/software/make/manual/html_node/Parallel-Disable.html
@@ -3004,7 +3003,7 @@ flux.stage.clean/%:
 	&& $(call log.flux, $${header} ${dim}removing stack file @ ${dim_cyan}${flux.stage.file}) \
 	&& rm -f ${flux.stage.file} 2>/dev/null || $(call log, $${header} ${yellow} could not remove stack file!)
 
-flux.stage.enter/% flux.stage/%:
+flux.stage.enter/% flux.stage/% stage/%:
 	@# Declares entry for the given stage.
 	@# Stage names are generally target names or similar, no spaces allowed.
 	@#
@@ -3158,14 +3157,6 @@ flux.timer/%:
 	&& time_diff_ns=$$((end_time - start_time)) \
 	&& delta=$$(awk -v ns="$$time_diff_ns" 'BEGIN {printf "%.9f", ns }') \
 	&& $(call log.flux, flux.timer ${sep} `echo ${*}|cut -d/ -f2-` ${sep} ${dim}$${label:-done in} ${yellow}$${delta}s)
-	
-# io.timer:
-# 	${trace_maybe} && start_time=$$(date +%s) \
-# 	&& eval $${script} \
-# 	&& end_time=$$(date +%s) \
-# 	&& time_diff_ns=$$((end_time - start_time)) \
-# 	&& delta=$$(awk -v ns="$$time_diff_ns" 'BEGIN {printf "%.9f", ns }') \
-# 	&& $(call log.flux, ${@} ${sep} ${dim}$${label:-done in} ${yellow}$${delta}s)
 
 flux.timeout/%:
 	@# Runs the given target for the given number of seconds, then stops it with TERM.
@@ -3224,7 +3215,8 @@ flux.try.except.finally/%:
 ## END: flux.* targets
 ## BEGIN: stream.* targets
 ##
-## The `stream.*` targets support IO streams, including basic stuff with JSON, newline-delimited, and space-delimited formats.
+## The `stream.*` targets support IO streams, including basic stuff with JSON,
+## newline-delimited, and space-delimited formats.
 ##
 ## **General purpose tools:**
 ##
@@ -3386,7 +3378,10 @@ stream.grep.safe=grep -iv password | grep -iv passwd
 
 # Run image previews differently for best results in github actions. 
 # See also: https://github.com/hpjansson/chafa/issues/260
-stream.img=${stream.stdin} | docker run -i --entrypoint chafa compose.mk:tux `[ "$${GITHUB_ACTIONS:-false}" = "true" ] && echo "--size 100x -c full --fg-only --invert --symbols dot,quad,braille,diagonal" || echo "--center on"` /dev/stdin
+stream.img=${stream.stdin} \
+	| docker run -i --entrypoint chafa compose.mk:tux `[ "$${GITHUB_ACTIONS:-false}" = "true" ] \
+	&& echo "--size 100x -c full --fg-only --invert --symbols dot,quad,braille,diagonal" \
+	|| echo "--center on"` /dev/stdin
 
 # Converts multiple sequential newlines to just one.
 stream.nl.compress=awk -v RS='\0' '{ gsub(/\n{2,}/, "\n"); printf "%s", $$0 RS }'
@@ -3428,10 +3423,12 @@ define Dockerfile.stream.pygmentize
 FROM ${IMG_ALPINE_BASE:-alpine:3.21.2}
 RUN apk add -q --update py3-pygments
 endef
+stream.pygmentize=${make} stream.pygmentize 
 stream.pygmentize: Dockerfile.build/stream.pygmentize
 	@# Syntax highlighting for the input stream.
 	@# Lexer will be autodetected unless override is provided.
 	@# Style defaults to 'monokai', which works best with dark backgrounds.
+	@# Also available as a macro.
 	@#
 	@# USAGE: (using JSON lexer)
 	@#   echo {} | lexer=json ./compose.mk stream.pygmentize
@@ -5050,7 +5047,6 @@ include ${CMK_SRC}
 \$(eval \$(call compose.import.generic, ▰, TRUE, ${fname}))
 EOF
 endef
-# export _TUI_TMUXP_PROFILE_DATA_ = $(value _TUI_TMUXP_PROFILE)
 
 ##░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 ## END: Macros

@@ -41,14 +41,14 @@ __main__: clean create deploy test
 
 # Cluster lifecycle basics.  These are similar for all demos, 
 # and mostly just setting up aliases for existing targets. 
-# The `flux.stage` are just announcing sections, `k3d.*` are library calls.
+# The `stage` are just announcing sections, `k3d.*` are library calls.
 #░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 clean cluster.clean teardown cluster.teardown: \
-	flux.stage/cluster.clean k3d.cluster.delete/$${CLUSTER_NAME}
+	stage/cluster.clean k3d.cluster.delete/$${CLUSTER_NAME}
 create cluster.create: \
-	flux.stage/cluster.create k3d.cluster.get_or_create/$${CLUSTER_NAME}
-deploy: flux.stage/deploy infra.setup app.setup
-test: flux.stage/test infra.test k8s.wait app.test
+	stage/cluster.create k3d.cluster.get_or_create/$${CLUSTER_NAME}
+deploy: stage/deploy infra.setup app.setup
+test: stage/test infra.test k8s.wait app.test
 wait cluster.wait: k8s.cluster.wait
 
 
@@ -58,7 +58,7 @@ wait cluster.wait: k8s.cluster.wait
 #░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 
 
-infra.setup: flux.stage/infra.setup k8s.dispatch/.infra.setup k8s.wait
+infra.setup: stage/infra.setup k8s.dispatch/.infra.setup k8s.wait
 .infra.setup: k8s.kubens.create/$${FISSION_NAMESPACE}
 	(kubectl create -k "github.com/fission/fission/crds/v1?ref=v1.21.0" 2>&1 || true) | ${stream.as.log} \
 	&& url="https://github.com/fission/fission/releases/download/v1.21.0/fission-all-v1.21.0-minikube.yaml" \
@@ -67,15 +67,15 @@ infra.setup: flux.stage/infra.setup k8s.dispatch/.infra.setup k8s.wait
 
 infra.teardown: k8s.dispatch/k8s.namespace.purge/$${FISSION_NAMESPACE}
 
-infra.test: flux.stage/infra.test fission.stat
+infra.test: stage/infra.test fission.stat
 
-app.setup: flux.stage/app.setup infra.test app.deploy k8s.wait app.test
+app.setup: stage/app.setup infra.test app.deploy k8s.wait app.test
 
-app.deploy: flux.stage/app.deploy fission.dispatch/.app.deploy
+app.deploy: stage/app.deploy fission.dispatch/.app.deploy
 .app.deploy: k8s.kubens/default 
 	img=fission/python-env ${make} fission.env.create/python
 
-app.test: flux.stage/app.test k8s.wait fission.dispatch/.app.test
+app.test: stage/app.test k8s.wait fission.dispatch/.app.test
 .app.test: k8s.kubens/default fission.stat
 	set -x \
 	&& fission function create \

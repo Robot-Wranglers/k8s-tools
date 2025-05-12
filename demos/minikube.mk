@@ -1,13 +1,12 @@
 #!/usr/bin/env -S make -f
 # demos/minikube.mk: 
-#   Demonstrating full cluster lifecycle automation with k8s-tools.git.
-#   This exercises `compose.mk`, `k8s.mk`, plus the `k8s-tools.yml` services to 
-#   interact with a small k3d cluster.  Verbs include: create, destroy, deploy, etc.
+#   Demonstrating multicluster networking with minikube, calico, 
+#   and submariner.  Verbs include: create, destroy, deploy, etc.
 #   
-# This demo ships with the `k8s-tools` repository and runs as part of the test-suite.
-# See the documentation here[1] for more discussion.  Note that this can quickly run 
-# into rate-limiting from docker.io, and you might want to setup a local registry 
-# mirror.  See [2]
+# This demo ships with the `k8s-tools` repository and runs as part of the 
+# test-suite.  See the documentation here[1] for more discussion.  Note that
+# repeatedly setting up calico can quickly run into rate-limiting with docker.io,
+# and you might want to setup a local registry mirror [2]
 #
 # USAGE: 
 #
@@ -38,15 +37,12 @@
 
 include k8s.mk
 export KUBECONFIG:=./local.cluster.yml
-export MINIKUBE_IN_STYLE=0
 $(shell umask 066; touch ${KUBECONFIG})
 $(shell mkdir -p ./.minikube)
 $(eval $(call compose.import, k8s-tools.yml))
 __main__: clean create deploy test
 
-# Cluster lifecycle basics.  These are similar for all demos, 
-# and mostly just setting up CLI aliases for existing targets. 
-# The `flux.stage` are just announcing sections, `k3d.*` are library calls.
+# Details for multi-cluster bootstrap.
 #░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 
 east.pod_cidr=10.244.0.0/16
@@ -54,64 +50,107 @@ east.service_cidr=10.240.0.0/16
 west.pod_cidr=10.245.0.0/16
 west.service_cidr=10.241.0.0/16
 minikube.args=--driver=docker --network-plugin=cni --cni=calico -v1 --wait=apiserver --embed-certs
-calico.url=https://raw.githubusercontent.com/projectcalico/calico/v3.29.0/manifests/tigera-operator.yaml
 
-clean teardown cluster.clean: flux.stage/cluster.clean minikube.purge
-wait cluster.wait: k8s.cluster.wait
-test cluster.test: flux.stage/test.cluster cluster.wait infra.test app.test
+clean: stage/clean flux.map/minikube.delete,east,west
+wait: k8s.cluster.wait
+test: stage/test wait flux.map/test.infra,east,west test.app
 
-create cluster.create: flux.stage/cluster.create k8s.dispatch/.create
-.create:
-	$(call log.k8s,Configuring clusters..)
-	set -x \
-	&& minikube start -p east \
-		${minikube.args} \
-		--service-cluster-ip-range=${east.service_cidr} \
-		--extra-config=kubeadm.pod-network-cidr=${east.pod_cidr} \
-	&& minikube start -p west \
-		${minikube.args} \
-		--service-cluster-ip-range=${west.service_cidr} \
-		--extra-config=kubeadm.pod-network-cidr=${west.pod_cidr} \
-	&& docker network connect east west 
+create: stage/create flux.map/minikube.dispatch/self.create,east,west
+	docker network connect east west
+self.create/%:
+	export minikube_extra="--service-cluster-ip-range=${${*}.service_cidr}" \
+	&& minikube_extra+=" --extra-config=kubeadm.pod-network-cidr=${${*}.pod_cidr}" \
+	&& ${make} minikube.cluster.get_or_create/${*}
 
-deploy: \
-	flux.stage/deploy \
-	k8s.dispatch/networking/east \
-	k8s.dispatch/networking/west \
+deploy: stage/deploy deploy.infra k8s.wait deploy.app
+
+deploy.infra: \
+	networking/east \
+	networking/west \
+	subctl.dispatch/broker.start \
 	subctl.dispatch/clusters.join
 
-networking/%:
-	$(call log.k8s,Configuring cluster ${bold} ${*})
-	set -x \
-	&& (\
-		kubectl create -f ${calico.url} --context ${*} \
-		|| true ) \
-	&& ${make} kubectl.namespace.wait/all
-	kubectx ${*} && ${make} kubectl.namespace.wait/all \
-	&& kubectl label node ${*} submariner.io/gateway=true --context ${*} \
-	&& kubectl apply -f c.${*}.yml --context ${*} \
-	&& kubectl apply -f demos/data/nginx.yml --context ${*} \
-	&& kubectl apply -f demos/data/nginx.svc.yml --context ${*} \
-	&& kubectl patch ippool default-ipv4-ippool \
-		--context ${*} --type=merge \
-		-p '{"spec": {"ipipMode": "Never", "vxlanMode": "Always"}}'
+networking/%:; $(call containerized.maybe, k8s)
+.networking/%:
+	@# NB: calico is partially installed by minikube already, 
+	@# so we must allow partial updates during CRDs installed by 
+	@# kubectl create, hence the `strict=0` used below.
+	kubectx ${*}
+	$(call log.k8s, ${@} ${sep} Starting calico installation..)
+	strict=0 ${make} kubectl.create/demos/data/tigera-operator-v3.29.0.yml
+	${make} kubectl.namespace.wait/all
+	${mk.def.read}/calico.installation.yml \
+		| ${yq} . -o json \
+		| ${jq} '.spec.calicoNetwork.ipPools[0].cidr="${${*}.service_cidr}"' \
+		| ${stream.peek} \
+		| ${kubectl.apply.stdin}
+	$(call log.k8s, ${@} ${sep} Patch IP pool and label gateway)
+	( \
+		kubectl patch ippool default-ipv4-ippool \
+			--context ${*} --type=merge \
+			-p '{"spec": {"ipipMode": "Never", "vxlanMode": "Always"}}' \
+		&& kubectl label node --context ${*} ${*} submariner.io/gateway=true \
+	) | ${stream.as.log}
 
-clusters.join: 
-	$(call log.k8s,Joining clusters together..)
+broker.start:
+	$(call log.k8s, ${@} ${sep} Starting broker on cluster-east)
 	subctl deploy-broker --context east
-	${make} io.wait/30 
+	${make} flux.loop.until/k8s.cluster.ready
+
+clusters.join: io.wait/30
 	subctl show brokers --context east
+	$(call log.k8s, ${@} ${sep} Joining east to mesh..)
 	subctl join broker-info.subm --natt=false --clusterid east --context east
-	${make} io.wait/30 
+	${make} io.wait/30
+	$(call log.k8s, ${@} ${sep} Joining west to mesh..)
 	subctl join broker-info.subm --natt=false --clusterid west --context west
-	${make} io.wait/30 
+	${make} io.wait/30
 
-infra.test: subctl.dispatch/.infra.test 
-.infra.test: 
-	subctl show all
-	subctl diagnose all
+test.infra/%:; $(call containerized.maybe, subctl)
+.test.infra/%:
+	$(call log.k8s, ${@} ${sep} Submariner diagnostics)
+	(   set -x \
+		&& kubectl get pod -n submariner-operator --context east \
+		&& kubectl get pod -n submariner-operator --context west \
+		&& subctl show all --context ${*} \
+		&& subctl diagnose all --context ${*} ) \
+	2> /dev/stdout | ${stream.nl.compress} | ${stream.indent}
 
-app.test: k8s.dispatch/.app.test
-.app.test:
-	kubectl get pod -n submariner-operator --context east
-	kubectl get pod -n submariner-operator --context west
+deploy.app: flux.map/k8s.dispatch/.app.deploy,east,west k8s.wait 
+.app.deploy/%:
+	$(call log.k8s,app.deploy ${sep} ${*} ${sep} Deploying test apps)
+	kubectl apply -f demos/data/nginx.yml --context ${*} \
+	&& kubectl apply -f demos/data/nginx.svc.yml --context ${*}
+
+test.app: k8s.dispatch/.test.app
+.test.app:
+	western=`kubectl get pods -l app=nginx -o jsonpath='{.items[0].metadata.name}' --context west` \
+	&& eastern=`kubectl get pods -l app=nginx -o jsonpath='{.items[0].metadata.name}' --context east` \
+	&& east_pod=`kubectl get pods --context east \
+		-l app=nginx -o jsonpath='{.items[0].status.podIP}'` \
+	&& $(call log.k8s, ${@} ${sep} Eastern pod ${sep}${dim} $${eastern} @ $${east_pod}) \
+	&& west_pod=`kubectl get pods --context west \
+		-l app=nginx -o jsonpath='{.items[0].status.podIP}'` \
+	&& $(call log.k8s, ${@} ${sep} Western pod ${sep}${dim} $${western} @ $${west_pod}) \
+	&& $(call log.k8s, ${@} ${sep} Checking west-to-east connectivity..) \
+	&& kubectl exec --context west -i $${western} -- \
+		curl -sS $${east_pod} | ${stream.nl.compress} | ${stream.as.log} \
+	&& $(call log.k8s, ${@} ${sep} Checking east-to-west connectivity..) \
+	&& kubectl exec --context east -i $${eastern} -- \
+		curl -sS $${west_pod} | ${stream.nl.compress} | ${stream.as.log}
+
+
+define calico.installation.yml
+apiVersion: operator.tigera.io/v1
+kind: Installation
+metadata:
+  name: default
+spec:
+  calicoNetwork:
+    ipPools:
+      - blockSize: 26
+        cidr: __REPLACED__
+        encapsulation: VXLANCrossSubnet
+        natOutgoing: Enabled
+        nodeSelector: all()
+endef

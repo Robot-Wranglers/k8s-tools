@@ -42,17 +42,17 @@ __main__: clean create deploy test
 
 # Cluster lifecycle basics.  These are similar for all demos, 
 # and mostly just setting up CLI aliases for existing targets. 
-# The `flux.stage` are just announcing sections, `k3d.*` are library calls.
+# The `stage` are just announcing sections, `k3d.*` are library calls.
 #░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 
 cluster.name=lifecycle-demo
 
 clean teardown cluster.clean: \
-	flux.stage/cluster.clean k3d.cluster.delete/${cluster.name}
+	stage/cluster.clean k3d.cluster.delete/${cluster.name}
 create cluster.create: \
-	flux.stage/cluster.create k3d.cluster.get_or_create/${cluster.name}
+	stage/cluster.create k3d.cluster.get_or_create/${cluster.name}
 wait cluster.wait: k8s.cluster.wait
-test cluster.test: flux.stage/test.cluster cluster.wait infra.test app.test
+test cluster.test: stage/test.cluster cluster.wait infra.test app.test
 
 # Local cluster details and main automation.
 #░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
@@ -64,7 +64,7 @@ pod_namespace=default
 # to be ready.  Then run a typical example operation with helm with retries,
 # then setup labels and a test-harness, and the prometheus stack
 deploy: \
-	flux.stage/deploy \
+	stage/deploy \
 	flux.loop.until/k8s.cluster.ready \
 	flux.retry/3/deploy.helm \
 	deploy.test_harness \
@@ -167,7 +167,7 @@ grafana.pod_name=prometheus-stack-grafana
 # run inside the helm container.  Note the usage of `grafana.helm.values` to 
 # provide custom values to helm, without any need for an external file.
 deploy.grafana:; $(call containerized.maybe, helm)
-.deploy.grafana: flux.stage/Grafana k8s.kubens.create/${grafana.namespace}
+.deploy.grafana: stage/Grafana k8s.kubens.create/${grafana.namespace}
 	$(call io.log, ${bold}Deploying Grafana)
 	( helm repo add prometheus-community ${grafana.chart.url} \
 	  && helm repo update \

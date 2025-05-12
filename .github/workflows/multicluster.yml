@@ -22,4 +22,5 @@ jobs:
       - name: Run Multi-cluster Demo
         run: ./demos/minikube.mk
         env:
-          COLUMNS: 150
+          # COLUMNS: 150
+          COLUMNS: 90

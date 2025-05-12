@@ -33,18 +33,13 @@ First, how about getting a list of tool containers that are defined?
 $ ./k8s.mk k8s-tools.services
 ansible
 argo
-awscli
-aws-iam-authenticator
+calicoctl
 cdk
 dind
-eksctl
 fission
 graph-easy
 helm
-helm-diff
 helmify
-helm-push
-helm-unittest
 istioctl
 k3d
 k8s
@@ -52,19 +47,16 @@ k9s
 kind
 kn
 kompose
-krew
-kubeconform
 kubectl
-kubectl_exec
 kubefwd
-kubeseal
-kustomize
+kubetail
 lazydocker
+minikube
 promtool
 rancher
+registry-mirror
 subctl
 tui
-vals
 ```
 
 #### Shells & Task Dispatch
@@ -103,9 +95,9 @@ $ ./k8s.mk kubefwd.ps
 ### Cluster CRUD
 <hr style="width:100%;border-bottom:3px solid black;">
 
-For creating, updating, and deleting clusters, the  [k3d API](/k8s-tools/api/#api-k3d) and the [kind API](/k8s-tools/api/#api-k3d) are the main resources you're probably interested in.  
+For creating, updating, and deleting clusters, the  [k3d API](/k8s-tools/api/#api-k3d) and the[kind API](/k8s-tools/api/#api-k3d) are the main resources you're probably interested in.
 
-Using `k3d` is usually good enough and requires no external configuration for node-groups, so that is usually the best choice.  Jump to the [Cluster Lifecycle Demo](/k8s-tools/demos#demo-cluster-automation) for a more substantial demo with scripting, but read on for the basics.
+Using `k3d` is good enough and requires no external configuration for node-groups, so that is usually the best choice.  Jump to the [Cluster Lifecycle Demo](/k8s-tools/demos#demo-cluster-automation) for a more substantial demo with scripting, but read on for the basics.
 
 ```bash 
 # Prep a blank kubeconfig 
@@ -199,14 +191,13 @@ $ ./k8s.mk jb name=ahoy \
     release_namespace=default \
     chart_ref=hello-world \
     chart_repo_url="https://helm.github.io/examples" \
-  | ./k8s.mk ansible.helm \
-  && ./k8s.mk k8s.wait
+  | ./k8s.mk ansible.helm k8s.wait
 ```
 
-This shows a looping status display which shows exactly what's still pending and what the cluster is up to.  Under the hood, it uses a colorized, looping version of krew's kubectl-sick-pods plugin[^2].
+The JSON input sets defaults for the call to `ansible.helm`, and then `k8s.wait` runs to show a looping status display which indicates exactly what's still pending and what the cluster is up to.  Under the hood, it uses a colorized, looping version of krew's kubectl-sick-pods plugin[^2].
 
 In a similar fashion you can use 
-[`k8s.namespace.wait/<namespace>`](/k8s-tools/api/#k8snamespacewaitarg) to block on one particular namespace, which opens up more interesting possibilities.  
+[`k8s.namespace.wait/<namespace>`](/k8s-tools/api/#k8snamespacewaitarg) to block on one particular namespace, which opens up more interesting possibilities.
 
 As highlighted elsewhere, the nature of Makefile ensures that the `k8s.mk` CLI is essentially one-to-one with the API.  So thanks to that, **tools like `k8s.wait` aren't just commands, but also a powerful synchronization primitive in scripting**, especially when they are used as target prerequisites.  Consider the following snippet of Makefile:
 
@@ -215,14 +206,17 @@ As highlighted elsewhere, the nature of Makefile ensures that the `k8s.mk` CLI i
 setup.platform:
 	kubectl apply ...
 
-# Blocks on `my_platform` being paved, then sets namespace as default and continues
-setup.app: k8s.namespace.wait/my_platform 
+# Blocks on `my_platform` bootstrap completing, then sets
+# the `my_platform` namespace as default inside the target body.
+setup.app: k8s.namespace.wait/my_platform k8s.kubens/my_platform
 	kubectl apply ...
 
 bootstrap: setup.platform setup.logging setup.monitoring setup.app
 ```
 
-Of course you could do this in pure shell or a variety of other ways.  Preferring a Makefile tends to keep things really organized though, and we retain the ability to execute every piece of it individually, rather than being stuck with some kind of top-to-bottom execution of everything.  Much more advanced stuff is possible by combining make's [native support for parallelism](https://www.gnu.org/software/make/manual/html_node/Parallel.html) and its own [synchronization primitives](https://www.gnu.org/software/make/manual/html_node/Parallel-Disable.html).
+Of course you could do this in pure shell or a variety of other ways, but preferring a Makefile tends to keep things organized.  First, we retained the ability to execute every piece of our cluster bootstrap individually, rather than being stuck with some kind of top-to-bottom execution of everything.  Second, we avoided `--namespace` arguments inside the target-body.
+
+Much more advanced stuff is possible by combining make's [native support for parallelism](https://www.gnu.org/software/make/manual/html_node/Parallel.html) and its own [synchronization primitives](https://www.gnu.org/software/make/manual/html_node/Parallel-Disable.html).
 
 
 <hr style="width:100%;border-bottom:3px solid black;">

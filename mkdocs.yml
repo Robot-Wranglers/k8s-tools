@@ -55,10 +55,10 @@ nav:
     - 'Tool Overview': 'tool-overview.md'
   - Demos:
     - 'Index of Demos': demos/index.md
-    - 'Cluster Lifecycle (k3d/prometheus)': demos/cluster-lifecycle.md
+    - 'Basic Cluster Lifecycle': demos/cluster-lifecycle.md
     - 'Argo Workflows Example': demos/argo-wf.md
     - 'FaaS with Fission': demos/fission.md
-    - 'Multi-Cluster Networking (minikube/submariner)': demos/minikube.md
+    - 'Multi-Cluster Networking': demos/multicluster.md
   - Other:
     - 'Configuration / Env Vars': config.md
     - limitations.md

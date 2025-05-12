@@ -41,6 +41,8 @@
 
 GLYPH_K8S=${green}⑆${dim}
 log.k8s=$(call log, ${GLYPH_K8S} ${1})
+k8s.log.part1=$(call log.part1,${GLYPH_K8S}${1})
+k8s.log.part2=$(call log.part2,${1})
 
 # Hints for exactly how k8s.mk is being invoked 
 export K8SMK_STANDALONE?=0
@@ -77,11 +79,12 @@ export IMG_ALPINE_K8S?=alpine/k8s:1.30.0
 #   foo:; $(call containerized.maybe, container_name)
 #   .foo:; echo hello-world
 .vars.k3d=${io.env}/k3d|awk -F'=' '{print $$1}'|${stream.nl.to.comma}
+.vars.minikube=${io.env}/minikube|awk -F'=' '{print $$1}'|${stream.nl.to.comma}
 define containerized.maybe
 case $${CMK_INTERNAL} in \
 	0)  ${log.target.rerouting} \
 		; ${trace_maybe} \
-		; env="$(strip $(subst ${space},${comma},$(if $(filter undefined,$(origin 2)),,$(2))) )`${.vars.k3d}`" \
+		; env="$(strip $(subst ${space},${comma},$(if $(filter undefined,$(origin 2)),,$(2))) )`${.vars.k3d}``${.vars.minikube}`" \
 			quiet=1 ${make} \
 				$(strip ${1}).dispatch/.$(strip ${@});; \
 	*) ${make} .$(strip ${@}) ;; \
@@ -237,6 +240,7 @@ ansible.run/%: .ansible.require
 	@# Alias for 'tux.require'.  We actually just want the dind-base to 
 	@# be ready, but this is the simplest way to ensure the bootstrap's 
 	@# done.  NB: This is potentially very slow if nothing is cached.
+
 #░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 ## BEGIN: argo.* targets
 ##
@@ -246,6 +250,7 @@ ansible.run/%: .ansible.require
 ## DOCS: 
 ##   [1] https://robot-wranglers.github.io/k8s-tools/api#api-argo
 #░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+
 argo.list: argo.list/argo 
 	@# List for the default namespace (i.e. "argo")
 
@@ -253,6 +258,8 @@ argo.list/%:; argo -n ${*} list
 	@# Returns the results of 'argo list' for the current argo context.
 
 argo.submit.url:
+	@#
+	@#
 	$(call log.k8s, ${@} ${sep} ${cyan_flow_left})
 	${io.get.url} && cat $${tmpf} | ${make} argo.submit.stdin
 
@@ -260,13 +267,13 @@ argo.submit.stdin=${make} argo.submit.stdin
 argo.submit.stdin stream.argo.submit :
 	@#
 	@#
-	@#
 	$(call log.k8s, ${@} ${sep} ${cyan_flow_left})
 	${stream.peek} | ${make} argo.submit/-
 
 argo.submit/%:
-	@#
-	@#
+	@# Pass the given path to `argo submit`.
+	@# This fills in CLI args for `--wait` and `--log` based 
+	@# on whether corresponding environment variables are set.
 	@#
 	$(call log.k8s, ${@} ${sep} ${cyan_flow_left})
 	log="--log" \
@@ -324,27 +331,45 @@ fission.env.create/%:; $(call containerized.maybe, fission)
 ##   [1] https://robot-wranglers.github.io/k8s-tools/api#api-minikube
 #░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 
-k8s.log.part1=$(call log.part1,${GLYPH_K8S}${1})
-k8s.log.part2=$(call log.part2,${1})
+minikube.args=
 
-minikube.stat/%: mk.require.tool/minikube
-	minikube status -p ${*} -o json | ${stream.as.log}
-minikube.cluster.delete/%:; minikube delete -p ${*}
-minikube.cluster.get_or_create/%:
+minikube.cluster.create/%:; $(call containerized.maybe, minikube)
+	@# Creates the given cluster unconditionally
+.minikube.cluster.create/%:
+	$(call log.k8s,minikube.cluster.create ${sep} ${bold} ${*})
+	( set -x \
+		&& minikube start -p ${*} ${minikube.args} $${minikube_extra:-} \
+		&> /dev/stdout ) \
+	| ${stream.as.log}
+
+minikube.cluster.get_or_create/%:; $(call containerized.maybe, minikube)
 	@# Create a minikube cluster if it does not already exist.
+.minikube.cluster.get_or_create/%:
 	$(call log.k8s, minikube.cluster.get_or_create ${sep} ${bold}${*})
 	${make} flux.do.unless/minikube.cluster.create/${*},minikube.has_cluster/${*}
-minikube.has_cluster/%:; ${make} minikube.cluster.list | grep -w ${*} >/dev/null 2>/dev/null
-minikube.cluster.create/%:; minikube start -p ${*}
 
-minikube.cluster.list:
+minikube.delete/% minikube.cluster.delete/%:; $(call containerized.maybe, minikube)
+	@# Deletes the named minikube cluster 
+.minikube.delete/% .minikube.cluster.delete/%:
+	$(call log.k8s, minikube.delete ${sep} ${bold}${*})
+	minikube delete -p ${*} &> /dev/stdout | ${stream.as.log}
+
+
+minikube.has_cluster/%:; $(call containerized.maybe, minikube)
+	@# Fails unless the given cluster name exists
+.minikube.has_cluster/%:
+	${make} minikube.cluster.list | grep -w ${*} >/dev/null 2>/dev/null
+
+minikube.cluster.list:; $(call containerized.maybe, minikube)
+.minikube.cluster.list:
 	minikube profile list -o json | ${jq} -r '.invalid[].Name'
 	minikube profile list -o json | ${jq} -r '.valid[].Name'
 
-minikube.purge:
+minikube.purge:; $(call containerized.maybe, minikube)
+	@# Purges all known minikube clusters
+.minikube.purge:
 	${make} minikube.cluster.list | xargs -I% sh -x -c "minikube delete -p %"
 
-# minikube.start:; minikube start --driver=docker
 minikube.require minikube.running: mk.require.tool/minikube
 	@#
 	hdr="${@} ${sep}${dim}" \
@@ -368,22 +393,17 @@ minikube.require minikube.running: mk.require.tool/minikube
 		&& $(call k8s.log.part2, $${ok}) \
 		|| ($(call k8s.log.part2, ${red}failed); exit 37))
 
+minikube.stat:; $(call containerized.maybe, minikube)
+	@# Show status for minikube itself and all known clusters
+.minikube.stat: mk.require.tool/minikube
+	${make} minikube.cluster.list | ${make} flux.each/minikube.stat
+
 #░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 ## BEGIN 'helm.*' targets
 ## DOCS: 
 ##   [1] https://robot-wranglers.github.io/k8s-tools/api#api-helm
 #░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 
-# helm.chart.install:
-# 	@#
-# 	@#
-# 	$(call log.part1, $${header} ) \
-# 	&& ${make} helm.release.stat/$${name} 2>/dev/null \
-# 	; case $$? in \
-# 		0) ($(call log.part2, ${dim_green}ok); ${make} helm.release.status/$${name} );; \
-# 		*) ($(call log.part2, ${dim_ital}missing) \
-# 			&& ${trace_maybe} && helm install $${name} $${chart_ref} -o json | jq .info);; \
-# 	esac
 helm.repo.list: helm.dispatch/.helm.repo.list
 	@# Returns JSON for the currently available helm repositories.
 .helm.repo.list:; helm repo list -o json
@@ -410,49 +430,46 @@ helm.list:; $(call containerized.maybe, k8s)
 ##   [1]: https://kind.sigs.k8s.io/
 ##   [2]: https://robot-wranglers.github.io/k8s-tools/api#api-kind
 #░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
-kind.purge:; $(call containerized.maybe, kind)
-.kind.purge:
-	set -x && kind delete clusters `kind get clusters|${stream.nl.to.space}`
-
-kind.cluster.list kind.list:; $(call containerized.maybe, kind)
-	@# Returns cluster-names, newline delimited.
-	@#
-	@# USAGE:  
-	@#   ./k8s.mk kind.cluster.list
-	@# 
-.kind.cluster.list .kind.list:; kind get clusters
-
-kind.cluster.exists/% kind.has_cluster/%:; $(call containerized.maybe, kind)
-	@# Succeeds iff cluster exists.
-.kind.cluster.exists/% .kind.has_cluster/%:; kind get clusters | grep ${*}
-
-kind.cluster.create/%:; $(call containerized.maybe, kind)
-	@# Creates a kind cluster with the given name, using the given configuration.
-	@# We force a `docker` provider rather than allowing autodetection, but allow 
-	@# autodetection for node-image, which usually has to match the `kind` version
-	@# being used anyway.  Must provide a path to a node-group config file.
-	@#
-	@# See the docs at https://kind.sigs.k8s.io/docs/user/quick-start/#advanced
-	@#
-	@# USAGE:
-	@#     config=<path> ./k8s.mk kind.cluster.create/<cluster_name>
-.kind.cluster.create/%:
-	$(call log.k8s, kind.cluster.create ${sep} ${bold}${*})
-	ls $${kind_config} \
-	|| ( \
-		$(call log.k8s,${red}Config file @ $${config} is missing, cannot continue) \
-		; exit 1 ) 
-	set -x \
-	&& kind create cluster \
-			--name ${*} --wait 24h --config $${kind_config}
-kind.cluster.delete/%:; $(call containerized.maybe, kind)
-	@# Idempotent version of kind cluster delete 
-	@#
-	@# USAGE:
-	@#   ./k8s.mk kind.cluster.delete/<cluster_name>
-.kind.cluster.delete/%:
-	$(call log.k8s, ${@} ${sep} Deleting cluster ${sep} ${underline}${*}${no_ansi})
-	(set -x && kind delete cluster --name ${*}) || true
+# kind.purge:; $(call containerized.maybe, kind)
+# .kind.purge:
+# 	set -x && kind delete clusters `kind get clusters|${stream.nl.to.space}`
+# kind.cluster.list kind.list:; $(call containerized.maybe, kind)
+# 	@# Returns cluster-names, newline delimited.
+# 	@#
+# 	@# USAGE:  
+# 	@#   ./k8s.mk kind.cluster.list
+# 	@# 
+# .kind.cluster.list .kind.list:; kind get clusters
+# kind.cluster.exists/% kind.has_cluster/%:; $(call containerized.maybe, kind)
+# 	@# Succeeds iff cluster exists.
+# .kind.cluster.exists/% .kind.has_cluster/%:; kind get clusters | grep ${*}
+# kind.cluster.create/%:; $(call containerized.maybe, kind)
+# 	@# Creates a kind cluster with the given name, using the given configuration.
+# 	@# We force a `docker` provider rather than allowing autodetection, but allow 
+# 	@# autodetection for node-image, which usually has to match the `kind` version
+# 	@# being used anyway.  Must provide a path to a node-group config file.
+# 	@#
+# 	@# See the docs at https://kind.sigs.k8s.io/docs/user/quick-start/#advanced
+# 	@#
+# 	@# USAGE:
+# 	@#     config=<path> ./k8s.mk kind.cluster.create/<cluster_name>
+# .kind.cluster.create/%:
+# 	$(call log.k8s, kind.cluster.create ${sep} ${bold}${*})
+# 	ls $${kind_config} \
+# 	|| ( \
+# 		$(call log.k8s,${red}Config file @ $${config} is missing, cannot continue) \
+# 		; exit 1 ) 
+# 	set -x \
+# 	&& kind create cluster \
+# 			--name ${*} --wait 24h --config $${kind_config}
+# kind.cluster.delete/%:; $(call containerized.maybe, kind)
+# 	@# Idempotent version of kind cluster delete 
+# 	@#
+# 	@# USAGE:
+# 	@#   ./k8s.mk kind.cluster.delete/<cluster_name>
+# .kind.cluster.delete/%:
+# 	$(call log.k8s, ${@} ${sep} Deleting cluster ${sep} ${underline}${*}${no_ansi})
+# 	(set -x && kind delete cluster --name ${*}) || true
 
 #░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 ## BEGIN: 'k3d.* targets
@@ -645,7 +662,7 @@ k8s.pod.shell/%:
 		-n $${namespace} -it $${pod_name} -- $${ishell}" \
 	&& docker compose -f ${K8S_TOOLS} run -it -e CMK_INTERNAL=1 k8s sh -x -c "$${script}"
 
-.k8s.pod.shell/%:
+kubectl.pod.shell/%:
 	namespace=`echo ${*}|cut -d/ -f1` \
 	&& pod_name=`echo ${*}|cut -d/ -f2` \
 	&& case $${user:-} in \
@@ -842,50 +859,6 @@ k8s.namespace.wait/%:; ${make} k8s.dispatch.quiet/kubectl.namespace.wait/${*}
 	--spinner.foreground=$${color:-39} \
 	--title=\"Waiting ${K8S_POLL_DELTA}s\" \
 	-- sleep ${K8S_POLL_DELTA}"
-kubectl.namespace.wait/%:
-	@# FIXME: use ${set_scope}
-	${set_scope} \
-	&& header="k8s.namespace.wait ${sep} ${dim}ctx=${dim_cyan}${kubectx} ${sep} ${green}${*}${no_ansi}" \
-	&& $(call log.k8s, $${header} ${sep}${dim} Looking for pods in state=waiting) \
-	&& until \
-		kubectl get pods $${scope} -o json 2> /dev/null \
-		| jq '${.filter.waiting}' 2> /dev/null \
-		| jq '.[] | halt_error(length)' 2> /dev/null \
-	; do \
-		${.sick.pods} \
-		&& $(call log, $${header} ${sep}${dim} ${io.timestamp} ${sep} ${bold}Pods not ready yet)\
-		&& eval ${.wait_cmd}; \
-	done \
-	&& $(call log.k8s, $${header} ${sep}${dim} ${io.timestamp} ${sep} No pods waiting ${GLYPH_SPARKLE}) \
-	&& ${make} k8s.pods \
-	&& case $${strict:-0} in \
-		0) true;; \
-		*) ${make} .k8s.namespace.pending/${*} ;; \
-	esac
-.filter.waiting=[.items[].status.containerStatuses[]|select(.state.waiting)]
-.filter.pending=[.items[].status.containerStatuses[]|select(.state.waitingzzzzzzzzzzz)]
-define .sick.pods 
-kubectl sick-pods $${scope} 2>&1 \
-	| sed 's/^[ \t]*//'\
-	| sed "s/FailedMount/$(shell printf "${yellow}Failed${no_ansi}")/g" \
-	| sed "s/streaming log results:/streaming log results:\n\t/g" \
-	| sed "s/is not ready! Reason Provided: None/$(shell printf "${bold}not ready!${no_ansi}")/g" \
-	| sed 's/ in pod /\n\t\tin pod /g' \
-	| sed -E 's/assigned (.*) to (.*)$$/assigned \1/g' \
-	| sed "s/Failed\n\n/$(shell printf "${yellow}Failed${no_ansi}")/g" \
-	| sed "s/Scheduled/$(shell printf "${yellow}Scheduled${no_ansi}")/g" \
-	| sed "s/Pulling/$(shell printf "${green}Pulling${no_ansi}")/g" \
-	| sed "s/Warning/$(shell printf "${yellow}Warning${no_ansi}")/g" \
-	| sed "s/Pod Conditions:/$(shell printf "☂${dim_green}${underline}Pod Conditions:${no_ansi}")/g" \
-	| sed "s/Pod Events:/$(shell printf "${underline}${dim_green}Pod Events:${no_ansi}")/g" \
-	| sed "s/Container Logs:/$(shell printf "${underline}${dim_green}Container Logs:${no_ansi}")/g" \
-	| sed "s/ContainerCreating/$(shell printf "${green}ContainerCreating${no_ansi}")/g" \
-	| sed "s/ErrImagePull/$(shell printf "${yellow}ErrImagePull${no_ansi}")/g" \
-	| sed "s/ImagePullBackOff/$(shell printf "${yellow}ImagePullBackOff${no_ansi}")/g" \
-	| sed ':a;N;$$!ba;s/\n\n/\n/g' \
-	| tr '☂' '\n' 2>/dev/null | ${stream.dim} > ${stderr} \
-&& printf '\n'>/dev/stderr 
-endef
 .k8s.namespace.pending/%:
 	${set_scope} \
 	&& header="k8s.namespace.pending ${sep} ${dim}ctx=${dim_cyan}${kubectx} ${sep} ${green}${*}${no_ansi}" \
@@ -907,12 +880,7 @@ k8s.pods k8s.pods.all: k8s.pods/all
 k8s.pods/%:; $(call containerized.maybe, k8s)
 	@# Shows human pods for all namespaces, excluding ones with "completed" status.
 	@# Not for parsing; this info is human friendly, and output to logging channel.
-.k8s.pods/%:
-	${set_scope} \
-	&& ( kubectl get pods $${scope} \
-			--field-selector=status.phase!=Completed \
-			-o "${.format.pod_columns}" | ${.format.header} \
-		) | ${stream.as.log}
+.k8s.pods/%:; ${make} kubectl.pods/${*}
 k8s.pods.watch:; entrypoint=watch cmd="-n1 kubectl get po -A" ${make} k8s
 
 k8s.ready k8s.cluster.ready:; $(call containerized.maybe, k8s)
@@ -1002,7 +970,7 @@ endef
 	esac \
 	&& case "$${interactive:-}" in \
 		"") true;; \
-		*) ${make} .k8s.pod.shell/$${namespace}/$${name};; \
+		*) ${make} kubectl.pod.shell/$${namespace}/$${name};; \
 	esac
 
 k8s.wait k8s.cluster.wait: k8s.namespace.wait/all
@@ -1048,23 +1016,10 @@ kubetail.serve:; $(call containerized.maybe, k8s)
 ## DOCS: 
 ##   [1] https://robot-wranglers.github.io/k8s-tools/api#api-kubectl
 #░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
-
-kubectl.namespace.create/%:
-	@# Idempotent version of namespace-create.
-	@#
-	@# USAGE: 
-	@#    kubectl.namespace.create/<namespace>
-	@#
-	$(call log.k8s, kubectl.namespace.create ${sep} ${bold}${*})
-	server_side=1 \
-	&& kubectl create namespace ${*} --dry-run=client -o yaml \
-		| ${stream.peek} | $(call _kubectl.apply, -)
-
 kubectl.quiet=>(grep -v "missing the kubectl.kubernetes.io/last-applied-configuration annotation")
 _kubectl.apply=kubectl apply \
 		`[ -z "$${server_side:-}" ] && echo "" || echo "--force-conflicts --server-side"` \
 		-f ${1} 2> ${kubectl.quiet}
-_kubectl.create=kubectl create -f ${1}
 kubectl.apply/%:
 	@# Runs kubectl apply on the given file,
 	@# Also available as a macro.
@@ -1083,22 +1038,47 @@ kubectl.apply.stdin= \
 		| ${stream.peek} \
 		| $(call _kubectl.apply, -)
 
-kubectl.create/%:; $(call _kubectl.create, ${*})
-kubectl.create.stdin:; $(call _kubectl.create, -)
-kubectl.create.url:; ${io.get.url} && ${make} kubectl.create/$${tmpf}
-
 kubectl.apply.url:; ${io.get.url} && ${make} kubectl.apply/$${tmpf} | ${stream.as.log}
 	@# Apply URL.  Rather than handing the URL directly to kubectl, 
 	@# this downloads the file first and applies as usual.
 	@# Also available as a macro.
 kubectl.apply.url=${make} kubectl.apply.url
 
-kubectl.namespace.list:
-	@# Returns all namespaces in a simple array.
-	@# NB: Must remain suitable for use with `xargs`!
+kubectl.cluster.stat:
+	@# Shows cluster status.
 	@#
-	kubectl get namespaces -o json \
-		| ${jq} -r '.items[].metadata.name'
+	$(call log.k8s, ${@} ${sep}${no_ansi_dim} Showing cluster status..)
+	kubectl version -o json 2>/dev/null | jq . || true
+	kubectl cluster-info -o json 2>/dev/null  | jq . || true
+
+_kubectl.create=kubectl create -f ${1}
+kubectl.create/%:
+	@# Interface for kubectl create.
+	$(call _kubectl.create, ${*}) 2> >(grep -v 'already exists$$') \
+	; result=$$? \
+	&& strict=$${strict:-1} \
+	&& case $${result} in \
+		0) true;; \
+		*) case $${strict} in \
+			0) $(call log.k8s, ${yellow}kubectl.create${dim} failed but strict=$${strict} and partial updates are allowed);; \
+			*) exit $${result};; \
+			esac;; \
+	esac
+
+kubectl.create.stdin:; $(call _kubectl.create, -)
+	@# Like `kubectl.create`, but accepts file-input on stdin
+kubectl.create.url:; ${io.get.url} && ${make} kubectl.create/$${tmpf}
+	@# Like `kubectl.create`, but expects that `url` is set in environment.
+
+
+kubectl.get.pod_names:; kubectl get pods -o=jsonpath='{.items[*].metadata.name}'
+kubectl.get.nodes:
+	@# Status for nodes. 
+	@# Not machine-friendly.  See instead 'kubectl.get'.
+	@#
+	node_count=`kubectl get nodes -oname|wc -l` \
+	&& $(call log.k8s, ${@} (${no_ansi}${green}$${node_count}${no_ansi_dim} total))
+	kubectl get nodes
 
 kubectl.exec.pipe/%:
 	@# Stream commands into the named pod.
@@ -1110,29 +1090,88 @@ kubectl.exec.pipe/%:
 	&& pod_name=$(shell echo ${*}|awk -F/ '{print $$2}') \
 	&& ${stream.stdin} | docker compose -f ${K8S_TOOLS} run -T k8s \
 		sh -x -c "KUBECONFIG=${KUBECONFIG} kubectl exec -n $${namespace} -i $${pod_name} -- bash"
-kubectl.pod.get/%:; kubectl get pod ${*} -o JSON
-kubectl.pods.get:; kubectl get pod ${*} -o JSON
 
-kubectl.get.pod_names:; kubectl get pods -o=jsonpath='{.items[*].metadata.name}'
-kubectl.get.nodes:
-	@# Status for nodes. 
-	@# Not machine-friendly.  See instead 'kubectl.get'.
-	@#
-	node_count=`kubectl get nodes -oname|wc -l` \
-	&& $(call log.k8s, ${@} (${no_ansi}${green}$${node_count}${no_ansi_dim} total))
-	kubectl get nodes
 kubectl.kubectx:
 	@#
 	@#
 	$(call log.k8s, ${@} ${sep} ${no_ansi_dim}Showing cluster context)
 	kubectx | ${stream.indent} 
 
-kubectl.cluster.stat:
-	@# Shows cluster status.
+kubectl.namespace.wait/%:
+	@# FIXME: use ${set_scope}
+	${set_scope} \
+	&& header="k8s.namespace.wait ${sep} ${dim}ctx=${dim_cyan}${kubectx} ${sep} ${dim}ns=${dim_cyan}${*}${no_ansi}" \
+	&& $(call log.k8s, $${header} ${sep}${dim} Looking for pods in state=waiting) \
+	&& until \
+		kubectl get pods $${scope} -o json 2> /dev/null \
+		| jq '${.filter.waiting}' 2> /dev/null \
+		| jq '.[] | halt_error(length)' 2> /dev/null \
+	; do \
+		${.sick.pods} \
+		&& $(call log, $${header} ${sep}${dim} ${io.timestamp} ${sep} ${bold}Pods not ready yet)\
+		&& eval ${.wait_cmd}; \
+	done \
+	&& $(call log.k8s, $${header} ${sep}${dim} ${io.timestamp} ${sep} No pods waiting ${GLYPH_SPARKLE}) \
+	&& ${make} kubectl.pods/${*} \
+	&& case $${strict:-0} in \
+		0) true;; \
+		*) ${make} .k8s.namespace.pending/${*} ;; \
+	esac
+.filter.waiting=[.items[].status.containerStatuses[]|select(.state.waiting)]
+.filter.pending=[.items[].status.containerStatuses[]|select(.state.waitingzzzzzzzzzzz)]
+define .sick.pods 
+kubectl sick-pods $${scope} 2>&1 \
+	| sed 's/^[ \t]*//'\
+	| sed "s/FailedMount/$(shell printf "${yellow}Failed${no_ansi}")/g" \
+	| sed "s/streaming log results:/streaming log results:\n\t/g" \
+	| sed "s/is not ready! Reason Provided: None/$(shell printf "${bold}not ready!${no_ansi}")/g" \
+	| sed 's/ in pod /\n\t\tin pod /g' \
+	| sed -E 's/assigned (.*) to (.*)$$/assigned \1/g' \
+	| sed "s/Failed\n\n/$(shell printf "${yellow}Failed${no_ansi}")/g" \
+	| sed "s/Scheduled/$(shell printf "${yellow}Scheduled${no_ansi}")/g" \
+	| sed "s/Pulling/$(shell printf "${green}Pulling${no_ansi}")/g" \
+	| sed "s/Warning/$(shell printf "${yellow}Warning${no_ansi}")/g" \
+	| sed "s/Pod Conditions:/$(shell printf "☂${dim_green}${underline}Pod Conditions:${no_ansi}")/g" \
+	| sed "s/Pod Events:/$(shell printf "${underline}${dim_green}Pod Events:${no_ansi}")/g" \
+	| sed "s/Container Logs:/$(shell printf "${underline}${dim_green}Container Logs:${no_ansi}")/g" \
+	| sed "s/ContainerCreating/$(shell printf "${green}ContainerCreating${no_ansi}")/g" \
+	| sed "s/ErrImagePull/$(shell printf "${yellow}ErrImagePull${no_ansi}")/g" \
+	| sed "s/ImagePullBackOff/$(shell printf "${yellow}ImagePullBackOff${no_ansi}")/g" \
+	| sed ':a;N;$$!ba;s/\n\n/\n/g' \
+	| tr '☂' '\n' 2>/dev/null | ${stream.dim} > ${stderr} \
+&& printf '\n'>/dev/stderr 
+endef
+
+kubectl.namespace.create/%:
+	@# Idempotent version of namespace-create.
 	@#
-	$(call log.k8s, ${@} ${sep}${no_ansi_dim} Showing cluster status..)
-	kubectl version -o json 2>/dev/null | jq . || true
-	kubectl cluster-info -o json 2>/dev/null  | jq . || true
+	@# USAGE: 
+	@#    kubectl.namespace.create/<namespace>
+	@#
+	$(call log.k8s, kubectl.namespace.create ${sep} ${bold}${*})
+	server_side=1 \
+	&& kubectl create namespace ${*} --dry-run=client -o yaml \
+		| ${stream.peek} | $(call _kubectl.apply, -)
+
+kubectl.namespace.list:
+	@# Returns all namespaces in a simple array.
+	@# NB: Must remain suitable for use with `xargs`!
+	@#
+	kubectl get namespaces -o json \
+		| ${jq} -r '.items[].metadata.name'
+
+kubectl.pods/%:
+	@#
+	${set_scope} \
+	&& ( kubectl get pods $${scope} \
+			--field-selector=status.phase!=Completed \
+			-o "${.format.pod_columns}" | ${.format.header} \
+		) | ${stream.as.log}
+kubectl.pod.get/%:; kubectl get pod ${*} -o JSON
+	@#
+
+kubectl.pods.get:; kubectl get pod ${*} -o JSON
+	@#
 
 kubectl.stat.auth:
 	$(call log.k8s, ${@} ${sep}${dim} kubectl auth whoami )

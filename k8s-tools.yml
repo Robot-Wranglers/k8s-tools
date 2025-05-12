@@ -64,10 +64,8 @@ services:
         RUN chown -R ${DOCKER_UID:-1000}:${DOCKER_GID:-1000} /home/${DOCKER_UGNAME:-root}/
         RUN curl -sL https://raw.githubusercontent.com/holman/spark/master/spark -o /usr/bin/spark && chmod ugo+x /usr/bin/spark
         RUN apk -q --no-cache add docker docker-compose
-        # required by minikube
-        RUN apk -q --no-cache add libc6-compat
-        RUN curl -LO https://github.com/kubernetes/minikube/releases/latest/download/minikube-linux-amd64
-        RUN install minikube-linux-amd64 /usr/local/bin/minikube && rm minikube-linux-amd64
+        RUN curl -sLo /usr/local/bin/kubetail https://github.com/kubetail-org/kubetail/releases/download/cli-${KUBETAIL_VERSION:-v0.5.2}/kubetail-linux-amd64
+        RUN chmod o+x /usr/local/bin/kubetail
         USER ${DOCKER_UGNAME:-root}
         ENV PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/home/${DOCKER_UGNAME:-root}/.krew/bin
     # NB: Left for reference, and possibly required by older versions of docker or certain configurations?  
@@ -112,34 +110,39 @@ services:
 
   kubetail:
     <<: *base
-    # hostname: k8s:kubetail 
-    # entrypoint: kubetail 
-    # build: 
-    #   context: . 
-    #   tags: ['k8s:kubetail']
-    #   dockerfile_inline: |
-    #     FROM k8s:base
-    #     RUN curl -sS https://www.kubetail.com/install.sh | bash -x
+    hostname: k8s:kubetail 
+    command: >- 
+      sh -x -c "kubetail serve --skip-open \
+      --kubeconfig /home/${DOCKER_UGNAME:-root}/.kube/config \
+      --port ${KUBETAIL_PORT:-9876} "
+    # --host 0.0.0.0
+    build: 
+      context: . 
+      tags: ['k8s:kubetail']
+      dockerfile_inline: |
+        FROM k8s:base
 
   minikube:
     <<: *base
-    # hostname: k8s:kubetail 
-    # entrypoint: kubetail 
-    # build: 
-    #   context: . 
-    #   tags: ['k8s:kubetail']
-    #   dockerfile_inline: |
-    # required by minikube
-    # RUN apk -q --no-cache add libc6-compat
-    # RUN curl -LO https://github.com/kubernetes/minikube/releases/latest/download/minikube-linux-amd64
-    # RUN install minikube-linux-amd64 /usr/local/bin/minikube && rm minikube-linux-amd64
+    hostname: k8s:minikube 
+    entrypoint: minikube 
+    build: 
+      context: . 
+      tags: ['k8s:minikube']
+      dockerfile_inline: |
+        FROM k8s:base AS base
+        USER root
+        RUN apk -q --no-cache add libc6-compat
+        RUN curl -sLo /usr/local/bin/minikube https://github.com/kubernetes/minikube/releases/latest/download/minikube-linux-amd64
+        RUN chmod o+x /usr/local/bin/minikube
+        USER ${DOCKER_UGNAME:-root}
 
-  registry-mirror:
-    image: registry:2
-    environment:
-      REGISTRY_PROXY_REMOTEURL: http://host.docker.internal:5000
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
+  # registry-mirror:
+  #   image: registry:2
+  #   environment:
+  #     REGISTRY_PROXY_REMOTEURL: http://host.docker.internal:5000
+  #   extra_hosts:
+  #     - "host.docker.internal:host-gateway"
 
   # https://helm.sh/docs/
   helm:

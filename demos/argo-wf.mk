@@ -40,15 +40,15 @@ __main__: clean create deploy test
 
 # Cluster lifecycle basics.  These are similar for all demos, 
 # and mostly just setting up aliases for existing targets. 
-# The `flux.stage` usage announces sections, `k3d.*` are library calls.
+# The `stage` usage announces sections, `k3d.*` are library calls.
 #░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 
 clean cluster.clean teardown cluster.teardown: \
-	flux.stage/cluster.clean k3d.cluster.delete/${cluster.name}
+	stage/cluster.clean k3d.cluster.delete/${cluster.name}
 create cluster.create: \
-	flux.stage/cluster.create k3d.cluster.get_or_create/${cluster.name}
+	stage/cluster.create k3d.cluster.get_or_create/${cluster.name}
 wait cluster.wait: k8s.cluster.wait
-test cluster.test: flux.stage/test.cluster cluster.wait infra.test app.test
+test cluster.test: stage/test.cluster cluster.wait infra.test app.test
 
 # Local cluster details
 #░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
@@ -61,7 +61,7 @@ argo.app_url=${argo.repo_raw}/main/examples/hello-world.yaml
 argo.infra_url=${argo.repo}/releases/download/${argo.workflows_version}/quick-start-minimal.yaml
 
 deploy cluster.deploy: \
-	flux.stage/cluster.deploy \
+	stage/cluster.deploy \
 	flux.loop.until/k8s.cluster.ready \
 	infra.setup
 

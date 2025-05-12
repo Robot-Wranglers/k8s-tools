@@ -151,3 +151,6 @@ actions.list/%:; gh run list --status ${*} --json databaseId
 	@# Helper for filtering action runs
 
 shell: tux.open.services/k8s.shell,subctl.shell
+
+zonk:; echo hello 
+	echo middle
