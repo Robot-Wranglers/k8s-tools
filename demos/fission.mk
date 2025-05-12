@@ -11,17 +11,18 @@
 #
 # USAGE: 
 #
-#     # Default runs clean, create, deploy, test, but does not tear down the cluster
-#     ./demos/fission.mk
+#   # Default entrypoint runs clean, create, deploy, 
+#   # and tests, but does does not tear down the cluster.  
+#   ./demos/fission.mk
 #
-#     # End-to-end, again without teardown 
-#     ./demos/fission.mk clean create deploy test
+#   # End-to-end, again without teardown 
+#   ./demos/fission.mk clean create deploy test
 #
-#     # Finally, teardown the cluster
-#     ./demos/fission.mk teardown
+#   # Finally, teardown the cluster
+#   ./demos/fission.mk teardown
 #
 # REF:
-#   [1] https://robot-wranglers.github.io/k8s-tools
+#   [1] https://robot-wranglers.github.io/k8s-tools/demos/faas
 ####################################################################################
 
 # Boilerplate.  
@@ -31,30 +32,31 @@
 # Setup the default target that will do everything, end to end.
 #░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 include k8s.mk
-export KUBECONFIG:=./fake.profile.yaml
+export KUBECONFIG:=./local.cluster.yml
 export _:=$(shell umask 066;touch ${KUBECONFIG})
 export CLUSTER_NAME:=k8s-tools-fission
+export FISSION_NAMESPACE?=fission
 $(eval $(call compose.import, k8s-tools.yml))
 __main__: clean create deploy test
 
-# Cluster lifecycle basics.  These are the same for all demos, and mostly just
-# setting up aliases for existing targets.  The `*.pre` targets setup hooks 
-# for declaring stage-entry.. optional but it keeps output formatting friendly.
+# Cluster lifecycle basics.  These are similar for all demos, 
+# and mostly just setting up aliases for existing targets. 
+# The `flux.stage` are just announcing sections, `k3d.*` are library calls.
 #░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
-clean.pre: flux.stage/cluster.clean
-clean cluster.clean teardown cluster.teardown: k3d.cluster.delete/$${CLUSTER_NAME}
-create.pre: flux.stage/cluster.create
-create cluster.create: k3d.cluster.get_or_create/$${CLUSTER_NAME}
-wait cluster.wait: k8s.cluster.wait
-test: flux.stage/test infra.test k8s.wait app.test
+clean cluster.clean teardown cluster.teardown: \
+	flux.stage/cluster.clean k3d.cluster.delete/$${CLUSTER_NAME}
+create cluster.create: \
+	flux.stage/cluster.create k3d.cluster.get_or_create/$${CLUSTER_NAME}
 deploy: flux.stage/deploy infra.setup app.setup
+test: flux.stage/test infra.test k8s.wait app.test
+wait cluster.wait: k8s.cluster.wait
+
 
 # Local cluster details
 #   - https://fission.io/docs/installation/
 #   - https://fission.io/docs/reference/fission-cli/fission_token_create/
 #░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 
-export FISSION_NAMESPACE?=fission
 
 infra.setup: flux.stage/infra.setup k8s.dispatch/.infra.setup k8s.wait
 .infra.setup: k8s.kubens.create/$${FISSION_NAMESPACE}

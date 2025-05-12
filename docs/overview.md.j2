@@ -7,7 +7,7 @@ Meet the **k8s-tools suite**, which aggregates 30+ individual utilities for work
 
 {{macros.img_link("e2e-k3d.commander.gif", mkdocs, "90%")}}
 
-**k8s-tools** operates at a project-automation layer and is designed to embrace and extend other tools, so it doesn't really conflict or compete with anything.  It's useful for CI/CD pipelines or prototyping systems and is designed to be [embedded alongside existing projects]({{mkdocs.site_relative_url}}/integration).  By using dockerized versions of `k3d` or `kind`, many operations for "clusters" can use docker for node groups as well, which makes it easy to do things like running end-to-end tests completely inside your existing CI without any need for external clusters.
+**k8s-tools** operates at a project-automation layer and is designed to embrace and extend other tools, so it doesn't really conflict or compete with anything.  It's useful for CI/CD pipelines or prototyping systems and is designed to be [embedded alongside existing projects]({{mkdocs.site_relative_url}}/integration).  By using dockerized versions of `k3d` or `kind`, many operations for "clusters" can use docker for kubernetes nodes, which makes it very easy to run end-to-end tests completely inside your existing CI without any need for external clusters.
 
 This reference focuses on a few use-cases in particular:
 

@@ -9,7 +9,8 @@
 #
 # USAGE: 
 #
-#   # Default entrypoint runs clean, create, deploy, test, but does not tear down the cluster.  
+#   # Default entrypoint runs clean, create, deploy, 
+#   # and tests, but does does not tear down the cluster.  
 #   ./demos/cluster-lifecycle.mk
 #
 #   # End-to-end, again without teardown 
@@ -25,128 +26,192 @@
 #   [1] https://robot-wranglers.github.io/k8s-tools/demos/cluster-lifecycle/
 #░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 
+# Boilerplate section.
+# Ensures local KUBECONFIG exists & ignores anything from environment
+# Sets cluster details that will be used by k3d.
+# Generates target-scaffolding for k8s-tools.yml services
+# Setup the default target that will do everything, end to end.
+#░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+
 include k8s.mk
-
-# Cluster details that will be used by k3d.
-export CLUSTER_NAME:=k8s-tools-e2e
-
-# Ensure local KUBECONFIG exists & ignore anything from environment
-export KUBECONFIG:=./fake.profile.yaml
-export _:=$(shell umask 066; touch ${KUBECONFIG})
-
-# Chart & Pod details that we'll use later during deploy
-export HELM_REPO:=https://helm.github.io/examples
-export HELM_CHART:=examples/hello-world
-export POD_NAME?=test-harness
-export POD_NAMESPACE?=default
-
-# Generate target-scaffolding for k8s-tools.yml services
+export KUBECONFIG:=./local.cluster.yml
+$(shell umask 066; touch ${KUBECONFIG})
 $(eval $(call compose.import, k8s-tools.yml))
-
-# Default entrypoint should do everything, end to end.
 __main__: clean create deploy test
 
-# Cluster lifecycle basics.  These are the same for all demos, and mostly just
-# setting up aliases for existing targets.  The `*.pre` targets setup hooks 
-# for declaring stage-entry.. optional but it keeps output formatting friendly.
+# Cluster lifecycle basics.  These are similar for all demos, 
+# and mostly just setting up CLI aliases for existing targets. 
+# The `flux.stage` are just announcing sections, `k3d.*` are library calls.
 #░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
-clean.pre: flux.stage/cluster.clean
-clean cluster.clean teardown: k3d.cluster.delete/$${CLUSTER_NAME}
-create.pre: flux.stage/cluster.create
-create cluster.create: k3d.cluster.get_or_create/$${CLUSTER_NAME}
+
+cluster.name=lifecycle-demo
+
+clean teardown cluster.clean: \
+	flux.stage/cluster.clean k3d.cluster.delete/${cluster.name}
+create cluster.create: \
+	flux.stage/cluster.create k3d.cluster.get_or_create/${cluster.name}
 wait cluster.wait: k8s.cluster.wait
+test cluster.test: flux.stage/test.cluster cluster.wait infra.test app.test
 
-# Local cluster particulars
+# Local cluster details and main automation.
 #░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 
-deploy.pre: flux.stage/deploy
+pod_name=test-harness
+pod_namespace=default
+
+# Main deployment entrypoint: First, announce the stage, then wait for cluster 
+# to be ready.  Then run a typical example operation with helm with retries,
+# then setup labels and a test-harness, and the prometheus stack
 deploy: \
+	flux.stage/deploy \
 	flux.loop.until/k8s.cluster.ready \
-	flux.retry/3/deploy.helm deploy.test_harness deploy.prometheus
-	# add a label to the default namespace
-	key=manager val=k8s.mk ${make} k8s.namespace.label/${POD_NAMESPACE}
+	flux.retry/3/deploy.helm \
+	deploy.test_harness \
+	deploy.labels \
+	deploy.grafana
 
-deploy.prometheus:
-	${json.from} name=prometheus-community \
-		chart_ref=prometheus chart_version=25.24.1 \
-		release_namespace=prometheus create_namespace=yes wait=yes \
-		chart_repo_url="https://prometheus-community.github.io/helm-charts" \
-	| ${make} ansible.helm
+# Add a random label to the default namespace
+deploy.labels:
+	kubectl label namespace default foo=bar
 
+# Run a typical deployment with helm.  Using `helm` directly is 
+# possible, but ansible is often nicer for idempotent operations.
+# This uses a container and can be called directly from the host.. 
+# so there is no need to install ansible *or* helm.  For more 
+# direct usage, see the grafana deploy later in this file.
 deploy.helm:
-	${json.from} name=ahoy release_namespace=default \
-		chart_ref=hello-world chart_repo_url="https://helm.github.io/examples" \
-	| ${make} ansible.helm io.time.wait/5
-
-deploy.test_harness: flux.retry/3/k8s.dispatch/self.test_harness.deploy
-self.test_harness.deploy: \
-	k8s.kubens.create/${POD_NAMESPACE} \
-	k8s.test_harness/${POD_NAMESPACE}/${POD_NAME} \
-	kubectl.apply/demos/data/nginx.svc.yml
-
-teardown:
-	${json.from} name=${POD_NAME} state=absent \
-		namespace=${POD_NAMESPACE} kind=Pod wait=yes \
-	| ${make} k8s.ansible
-	${json.from} wait=true name=ahoy state=absent release_namespace=default \
+	${json.from} name=ahoy \
+		chart_ref=hello-world \
+		release_namespace=default \
+		chart_repo_url="https://helm.github.io/examples" \
 	| ${make} ansible.helm 
 
-#░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+# Here `deploy.test_harness` has a public interface chaining to a "private" 
+# target for internal use. The public interface just runs the private one 
+# inside the `k8s` container, which makes it safe to use `kubectl` directly 
+# even though it might not be present on the host.  The cluster should be 
+# already setup but we retry a maximum of 3 times anyway just for illustration
+# purposes.
+deploy.test_harness: flux.retry/3/k8s.dispatch/self.test_harness.deploy
+self.test_harness.deploy: \
+	k8s.kubens.create/${pod_namespace} \
+	k8s.test_harness/${pod_namespace}/${pod_name} \
+	kubectl.apply/demos/data/nginx.svc.yml
 
-test.pre: flux.stage/test.cluster
-test: cluster.wait
+# Simulate some infrastructure testing after setup is done. 
+# This just shows the cluster's pod/service topology
+infra.test:
 	label="Showing kubernetes status" \
 		${make} io.print.banner k8s.stat 
 	label="Previewing topology for default namespace" \
 		${make} io.print.banner k8s.graph.tui/default/pod
 	label="Previewing topology for kube-system namespace" \
 		${make} io.print.banner k8s.graph.tui/kube-system/pod
-	label="Previewing topology for prometheus namespace" \
-		${make} io.print.banner k8s.graph.tui/prometheus/pod
-	label="Demo pod connectivity" \
-		${make} io.print.banner get.compose.ctx get.pod.ctx 
 
-get.compose.ctx:
-	@# Runs on the container defined by compose service
-	echo uname -n | ${make} k8s.shell.pipe
+# Simulate some application testing after setup is done. 
+# This pulls data from a pod container deployed to the cluster,
+# shows an overview of whatever's already been deployed with helm.
+app.test:
+	label="Demo pod connectivity" ${make} io.print.banner
+	echo uname -n | ${make} kubectl.exec.pipe/${pod_namespace}/${pod_name}
+	label="Helm Overview" ${make} io.print.banner helm.stat
 
-get.pod.ctx:
-	@# Runs inside the kubernetes cluster
-	echo uname -n | ${make} kubectl.exec.pipe/${POD_NAMESPACE}/${POD_NAME}
-
-
-# Grafana setup and other optional, more interactive stuff.
-# User can opt-in and run this part manually.. see docs.
+# Grafana setup and other optional, more interactive stuff that's part of
+# the demo documentation.  User can opt-in and walk through this part manually
+# We include the grafana.ini below just to demonstrate passing custom values
+# to the helm chart.  For more configuration details see kube-prom-stack[1],
+# grafana's docs [2].  More substantial config here might involve custom 
+# dashboarding with this [3] 
+#
+# [1] https://github.com/prometheus-community/helm-charts
+# [2] https://grafana.com/docs/grafana/latest/setup-grafana/configure-grafana/
+# [3] https://docs.ansible.com/ansible/latest/collections/grafana/grafana/dashboard_module.html
 #░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 
-# Replace with environment variable, or grab value from external secret store!
-grafana.password=test
+# Custom values to pass to helm, just to show we can. 
+# See `deploy.grafana` for usage, see [2] for docs
+define grafana.helm.values
+grafana:
+  grafana.ini:
+    analytics:
+      check_for_updates: false
+    grafana_net:
+      url: https://grafana.net
+    log:
+      mode: console
+    paths:
+      data: /var/lib/grafana/
+      logs: /var/log/grafana
+      plugins: /var/lib/grafana/plugins
+      provisioning: /etc/grafana/provisioning
+endef
 
+# NB: Default password is preset by the charts. Real usage should override 
+# but with grafana, your best bet is jumping straight into oauth. There are
+# more than 5 years of github issues and forum traffic about fixes, regressions, 
+# conflicting info and general confusion for setting non-default admin passwords 
+# programmatically.  Want an experimental setup that avoids auth completely? 
+# Those docs are also lies!
+grafana.password=prom-operator
+grafana.port_map=80:${grafana.host_port}
+grafana.host_port=8089
+grafana.url_base=http://grafana:${grafana.host_port}
+grafana.chart.version=72.2.0
+grafana.chart.url=https://prometheus-community.github.io/helm-charts
+grafana.namespace=monitoring
+grafana.pod_name=prometheus-stack-grafana
+
+# Deployment for grafana.  Use helm directly this time instead of via ansible.
+# Since the host might not have `helm` or not be using a standard version, we
+# run inside the helm container.  Note the usage of `grafana.helm.values` to 
+# provide custom values to helm, without any need for an external file.
+deploy.grafana:; $(call containerized.maybe, helm)
+.deploy.grafana: flux.stage/Grafana k8s.kubens.create/${grafana.namespace}
+	$(call io.log, ${bold}Deploying Grafana)
+	( helm repo add prometheus-community ${grafana.chart.url} \
+	  && helm repo update \
+	  && ${mk.def.read}/grafana.helm.values | ${stream.peek} \
+		| helm install prometheus-stack \
+			prometheus-community/kube-prometheus-stack \
+			--namespace ${grafana.namespace} --create-namespace \
+			--version ${grafana.chart.version} \
+			--values /dev/stdin \
+		&& ${make} helm.stat ) | ${stream.as.log}
+
+# Starts port-forwarding for grafana webserver. Working external DNS from host
 fwd.grafana:
-	mapping="80:8081" ${make} kubefwd.start/prometheus/grafana
-	$(call io.log, Connect with: http://admin:${grafana.password}@grafana:8081\n)
+	mapping="${grafana.port_map}" ${make} kubefwd.start/${grafana.namespace}/${grafana.pod_name}
+	$(call io.log, Connect with: http://admin:prom-operator@grafana:${grafana.host_port}\n)
+fwd.grafana.stop: kubefwd.stop/stop/${grafana.namespace}/${grafana.pod_name}
 
-deploy.grafana:
-	${json.from} \
-		name=grafana chart_ref=grafana \
-		wait=yes values:raw='{"adminPassword":"${grafana.password}"}' \
-		create_namespace=yes release_namespace=prometheus \
-		chart_repo_url=https://grafana.github.io/helm-charts \
-	| ${make} ansible.helm
-	${make} k8s.dispatch/grafana.set.password
 
-grafana.set.password: k8s.kubens/prometheus
-	@# NB: setting the password with helm charts doesnt actually work, 
-	@# so we do it manually again afterwards.  See also:
-	@# https://github.com/helm/charts/issues/7891#issuecomment-572767968
-	$(call io.log.part1, Lookup grafana secret) \
-	&& secret=`kubectl get secret grafana -o jsonpath='{.data.admin-password}' | base64 --decode` \
-	&& $(call io.log.part2, OK) \
-	&& $(call io.log.part1, Lookup grafana pod) \
-	&& pod=`kubectl get pod -l "app.kubernetes.io/name=grafana" -o jsonpath='{.items[0].metadata.name}'` \
-	&& $(call io.log.part2, $${pod}) \
-	&& set -x && kubectl exec -i $${pod} -c grafana -- grafana cli --homepath /usr/share/grafana admin reset-admin-password $${secret}
+# Runs all the grafana tests, some from inside the cluster, some from outside.
+test.grafana: test.grafana.basic test.grafana.api 
 
-cluster.shell: k8s.pod.shell/${POD_NAMESPACE}/${POD_NAME}
-	@# Opens an interactive shell into the test-pod.
-	@# This requires that `deploy.test_harness` has already run.
+# Another public/private pair of targets.
+# The public one is safe to run from the host, and just calls the private target 
+# from inside a tool container.  Since `.test.grafana.basic` runs in a container, 
+# it's safe to use kubectl (and lots of other tools) without assuming they are 
+# available on the host.  Also note the usage of `k8s.kubens/..` prerequisite to 
+# set the kubernetes namespace that's used for the rest of the target body.
+test.grafana.basic:; $(call containerized.maybe, kubectl)  
+.test.grafana.basic: k8s.kubens/monitoring
+	kubectl get pods
+
+# Tests the grafana webserver and API, using the default authentication,
+# from the host.  Note that this requires kubefwd tunnel has already been 
+# setup using the `fwd.grafana` target, and that the docker-host actually 
+# has curl!  First request grabs cookies for auth and the second uses them.
+test.grafana.api:
+	$(call io.log, ${bold}Testing Grafana API)
+	${io.mktemp} \
+	&& curl -sS -c $${tmpf} -X POST ${grafana.url_base}/login \
+		-H "Content-Type: application/json" \
+		-d '{"user":"admin", "password":"${grafana.password}"}' \
+	&& curl -sS -b $${tmpf} ${grafana.url_base}/api/search \
+		| ${jq} '.[]|select(.title|contains("Prometheus"))' \
+		| ${stream.as.log}
+
+# Opens an interactive shell into the test-pod.
+# This requires that `deploy.test_harness` has already run.
+cluster.shell: cluster.wait k8s.pod.shell/${pod_namespace}/${pod_name}

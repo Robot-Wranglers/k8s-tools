@@ -10,15 +10,12 @@ Basic installation is just copying files and making them executable:
 $ cd myproject 
 
 # Download compose.mk, k8s.mk, and k8s-tools.yml
-$ curl -sL \
-  https://raw.githubusercontent.com/Robot-Wranglers/k8s-tools/master/compose.mk \
-    > compose.mk
-$ curl -sL \
+$ curl -sLo compose.mk \
+  https://raw.githubusercontent.com/Robot-Wranglers/k8s-tools/master/compose.mk
+$ curl -sLo k8s.mk \
   https://raw.githubusercontent.com/Robot-Wranglers/k8s-tools/master/k8s.mk \
-    > k8s.mk
-$ curl -sL \
+$ curl -sLo k8s-tools.yml \
   https://raw.githubusercontent.com/Robot-Wranglers/k8s-tools/master/k8s-tools.yml \
-    > k8s-tools.yml
 
 # Make scripts executable
 $ chmod +x compose.mk k8s.mk k8s-tools.yml
@@ -31,17 +28,28 @@ $ ./k8s.mk ...
 $ ./k8s-tools.yml ...
 ```
 
+Local clusters with lots of containers might require increasing the OS limits for open-files.  See [the kind docs](https://kind.sigs.k8s.io/docs/user/known-issues#pod-errors-due-to-too-many-open-files) for hints about increasing this value.
+
+That's it for basic installation, and at this point you can do lots of stuff by using `k8s.mk` in stand-alone mode.  Read on for tighter project integration, library usage, and scripting.
+
 ### Project Integration
 <hr style="width:100%;border-bottom:3px solid black;">
 
 In your project Makefile:
 
 ```Makefile
+# Include the `k8s.mk` library.  
+# This implicitly includes `compose.mk`
 include k8s.mk
+
+# generate target scaffolding for the tool containers
+$(eval $(call compose.import, k8s-tools.yml))
 ```
 
 ### For Developers
 <hr style="width:100%;border-bottom:3px solid black;">
+
+To run demos yourself, you'll want to clone the repository.
 
 ```bash
 # for ssh
@@ -53,7 +61,7 @@ $ git clone https://github.com/Robot-Wranglers/k8s-tools.git
 # pre-cache the containers
 $ make build 
 
-# run all the demos 
+# run all the demos
 $ make demos
 ```
 <br/>

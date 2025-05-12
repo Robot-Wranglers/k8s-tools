@@ -1,0 +1,25 @@
+# See also: https://docs.github.com/en/actions
+name: Multi-cluster Demo
+on:
+  workflow_dispatch: {}
+  workflow_call: {}
+  push:
+    branches: [ "main" ]
+    paths-ignore:  ['**.gif', '**.md', '**.md.j2', '**.mmd', '**.png', '**.svg']
+  pull_request:
+    branches: [ "main" ]
+    paths-ignore:  ['**.gif', '**.md', '**.md.j2', '**.mmd', '**.png', '**.svg']
+permissions:
+  contents: read
+jobs:
+  test:
+    name: FaaS Demo
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Initialize
+        run: make clean build
+      - name: Run Multi-cluster Demo
+        run: ./demos/multicluster.mk
+        env:
+          COLUMNS: 150

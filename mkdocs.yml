@@ -52,9 +52,11 @@ nav:
     - 'Library Tour': 'lib.md'
     - 'Full API': 'api.md'
   - Demos:
-    - 'End-to-End Cluster Lifecycle': demos/cluster-lifecycle.md
+    - 'Index of Demos': demos/index.md
+    - 'Cluster Lifecycle (k3d/prometheus)': demos/cluster-lifecycle.md
     - 'Argo Workflows Example': demos/argo-wf.md
     - 'FaaS with Fission': demos/fission.md
+    - 'Multi-Cluster Networking (minikube/submariner)': demos/minikube.md
   - Other:
     - 'Configuration / Env Vars': config.md
     - limitations.md

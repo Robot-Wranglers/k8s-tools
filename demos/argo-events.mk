@@ -28,7 +28,7 @@ include compose.mk
 include k8s.mk
 
 # Ensure local KUBECONFIG exists & ignore anything from environment
-export KUBECONFIG:=./fake.profile.yaml
+export KUBECONFIG:=./local.cluster.yml
 export _:=$(shell umask 066;touch ${KUBECONFIG})
 
 # Cluster details that will be used by k3d.

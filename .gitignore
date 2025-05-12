@@ -24,6 +24,10 @@ docs/cli-help.md
 docs/bridge.md
 docs/raw-docker.md
 docs/tool-overview.md
-fake.profile.yaml
+local.cluster.yml
 *.profile.yaml
 docs/*md
+broker-info.subm
+__pycache__
+broker-info.*
+.minikube

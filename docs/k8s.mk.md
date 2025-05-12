@@ -31,39 +31,40 @@ First, how about getting a list of tool containers that are defined?
 
 ```bash 
 $ ./k8s.mk k8s-tools.services
-k8s
-dind
 ansible
-kubefwd
-krew
-kubectl_exec
-rancher
+argo
+awscli
+aws-iam-authenticator
+cdk
+dind
+eksctl
+fission
+graph-easy
+helm
+helm-diff
+helmify
 helm-push
+helm-unittest
+istioctl
+k3d
+k8s
 k9s
+kind
 kn
 kompose
-vals
-argo
-eksctl
-k3d
-helm-unittest
-helmify
-istioctl
+krew
 kubeconform
-lazydocker
-aws-iam-authenticator
-awscli
-helm-diff
-tui
 kubectl
-promtool
-cdk
-fission
-kind
-graph-easy
+kubectl_exec
+kubefwd
 kubeseal
 kustomize
-helm
+lazydocker
+promtool
+rancher
+subctl
+tui
+vals
 ```
 
 #### Shells & Task Dispatch
@@ -128,7 +129,7 @@ $ ./k8s.mk k3d.cluster.list k3d.stat
 $ ./k8s.mk k3d.cluster.delete/mycluster
 ```
 
-Interesting, right? A stand alone, project local cluster where even the nodes are dockerized, and without even installing `k3d` as a dependency.
+Interesting, right? A stand alone, project local cluster where even the nodes are dockerized, and without even installing `k3d` as a dependency. See the [Lifecycle Demo](/k8s-tools/demos/cluster-lifecycle) for a more complete example with scripting, or the [Multicluster Demo](/k8s-tools/demos/multicluster) for an example with 2 clusters.
 
 ### Basic Platforming
 <hr style="width:100%;border-bottom:3px solid black;">
