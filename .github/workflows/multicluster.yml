@@ -1,5 +1,5 @@
 # See also: https://docs.github.com/en/actions
-name: Multi-cluster Demo
+name: Multicluster Networking
 on:
   workflow_dispatch: {}
   workflow_call: {}
@@ -13,13 +13,13 @@ permissions:
   contents: read
 jobs:
   test:
-    name: FaaS Demo
+    name: Multicluster Networking Demo
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
       - name: Initialize
-        run: make clean build
+        run: make clean init build
       - name: Run Multi-cluster Demo
-        run: ./demos/multicluster.mk
+        run: ./demos/minikube.mk
         env:
           COLUMNS: 150
