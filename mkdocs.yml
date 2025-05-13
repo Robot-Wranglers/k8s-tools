@@ -56,15 +56,15 @@ nav:
   - Demos:
     - 'Index of Demos': demos/index.md
     - 'Basic Cluster Lifecycle': demos/cluster-lifecycle.md
+    - 'Multi-Cluster Networking': demos/multicluster.md
+    - 'Debugging with Kubetail': demos/kubetail.md
     - 'Argo Workflows Example': demos/argo-wf.md
     - 'FaaS with Fission': demos/fission.md
-    - 'Multi-Cluster Networking': demos/multicluster.md
   - Other:
     - 'Configuration / Env Vars': config.md
     - limitations.md
     - contributing.md
     - 'Project Source': 'https://github.com/robot-wranglers/k8s-tools/'
-
 plugins:
   - search
   - autolinks
@@ -82,4 +82,3 @@ markdown_extensions:
   - attr_list
 docs_dir: docs
 site_dir: site
-  

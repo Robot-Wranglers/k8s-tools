@@ -1,0 +1,34 @@
+{% import 'macros.j2' as macros -%}
+
+## Debugging with Kubetail
+<hr style="width:100%;border-bottom:3px solid black;">
+
+Kubetail is great, check out [the official project page](https://github.com/kubetail-org/kubetail).
+
+The k8s-tools suite has some conveniences for working with kubetail supports both usage of stand-alone
+
+### Interactive Workflows
+<hr style="width:100%;border-bottom:3px solid black;">
+
+```bash 
+$ KUBECONFIG=.. ./k8s.mk kubetail.up
+
+# End-to-end, again without teardown 
+$ ./demos/argo-wf.mk clean create deploy test
+
+# Finally, teardown the cluster
+$ ./demos/argo-wf.mk teardown
+```
+
+{#
+Placeholder
+
+### Source Code 
+<hr style="width:100%;border-bottom:3px solid black;">
+
+```Makefile
+{{open('demos/argo-wf.mk','r').read().strip()}}
+```
+#}
+
+<hr style="width:100%;border-bottom:3px solid black;">
