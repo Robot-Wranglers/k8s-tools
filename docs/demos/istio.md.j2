@@ -1,0 +1,43 @@
+{% import 'macros.j2' as macros -%}
+
+## Traffic Management with Istio
+<hr style="width:100%;border-bottom:3px solid black;">
+
+Prototyping or faithfully mirroring cross-cluster networking *locally* is something that's usually pretty painful to do, so let's see what the k8s-tools suite can do with this sort of problem.  As usual, the goal is that there are still *no host dependencies at all* except for `make` and `docker`, and the entire thing runs well locally or [inside of github actions]({{github.actions_url}}/multicluster.yml). 
+
+#### Source Code
+<hr style="width:95%;border-bottom:1px dashed black;">
+
+```Makefile
+{{open('demos/istio.mk','r').read().strip()}}
+```
+
+### Basic Usage
+<hr style="width:100%;border-bottom:3px solid black;">
+
+Running the demo is simple: 
+
+```bash 
+# Default entrypoint runs clean, create, deploy, test, but does not tear down the cluster.  
+$ ./demos/minikube.mk
+
+# End-to-end, again without teardown
+$ ./demos/minikube.mk clean create deploy test
+```
+
+### End-to-End Output
+<hr style="width:100%;border-bottom:3px solid black;">
+
+The following *(large)* image shows the full output of `./demos/minikube.mk clean create deploy test teardown`.  
+
+{{macros.img_link("minikube.png", mkdocs, "33%")}}
+
+### Conclusion
+<hr style="width:100%;border-bottom:3px solid black;">
+
+Placeholder
+
+<hr style="width:100%;border-bottom:3px solid black;">
+
+[^1]: [https://istio.io/](https://istio.io/latest/)
+[^2]: Official docs [for istio traffic management](https://istio.io/latest/docs/concepts/traffic-management/#virtual-service-example)
