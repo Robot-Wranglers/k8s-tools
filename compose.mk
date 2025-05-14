@@ -54,6 +54,7 @@
 #/* \
 _make_="make -sS --warn-undefined-variables -f ${0}"; trace="${TRACE:-${trace:-0}}"; \
 no_ansi="\033[0m"; green="\033[92m"; dim="\033[2m"; sep="${no_ansi}//${dim}";\
+export CMK_SRC=${0}; export __file__=${0}; \
 case ${CMK_SUPERVISOR:-1} in \
 	0) ([ "${trace}" == 0 ] || \
 		printf "ᐂ ${sep}Skipping setup for signal handlers..\n${no_ansi}">/dev/stderr); \
@@ -67,7 +68,7 @@ case ${CMK_SUPERVISOR:-1} in \
 			0) _targets="`echo ${@:-mk.__main__} | quiet=1 ${_make_} io.awker/.awk.rewrite.targets.maybe`";; \
 			1) _targets="${@:-mk.__main__}";; \
 		esac; \
-		CMK_DISABLE_HOOKS=1 ${_make_} mk.supervisor.enter/${MAKE_SUPER} ${_targets} \
+		${_make_} mk.supervisor.enter/${MAKE_SUPER} ${_targets} \
 			2> >(sed '/^make.*:.*mk.interrupt\/SIGINT.*Killed/,/^make:.*Error.*/d' >/dev/stderr); \
 		st=$? ; CMK_DISABLE_HOOKS=1 ${_make_} mk.supervisor.exit/${st}; st=$?; ;; \
 esac \
@@ -269,10 +270,9 @@ log.part1=(${log.stdout.part1}>${stderr})
 log.part2=(${log.stdout.part2}>${stderr})
 
 define _compose_quiet
-2> >(\
-	grep -vE '.*Container.*(Running|Recreate|Created|Starting|Started)' \
-	>&2 \
-	| grep -vE '.*Network.*(Creating|Created)' >&2 )
+2> >( grep -vE \
+		'.*Container.*(Running|Recreate|Created|Starting|Started)' >&2 \
+	  | grep -vE '.*Network.*(Creating|Created)' >&2 )
 endef
 docker.run.base:=docker run --rm -i 
 
@@ -282,17 +282,20 @@ docker.run.base:=docker run --rm -i
 ##
 ## Variables used internally:
 ##
-## | Variable               | Meaning                                                          |
-## | ---------------------- | ---------------------------------------------------------------- |
-## | CMK_COMPOSE_FILE       | *Temporary file used for the embedded-TUI*                       |
-## | CMK_DIND               | *Determines whether docker-in-docker is allowed*                 |
-## | CMK_INTERNAL           | *1 if dispatched inside container, otherwise 0*                  |
-## | CMK_SUPERVISOR         | *1 if supervisor/signals is enabled, otherwise 0*                |
-## | COMPOSE_IGNORE_ORPHANS | *Honored by 'docker compose', this helps to quiet output*        |
-## | DOCKER_HOST_WORKSPACE  | *Needs override for correctly working with DIND volumes*         |
-## | TRACE:                 | Increase verbosity (more detailed than verbose)                  |
-## | GITHUB_ACTIONS:        | true if running inside github actions, false otherwise           |
-## | verbose:               | 1 if normal debugging output should be shown, otherwise 0        |
+## | Variable               | Meaning                                                             |
+## | ---------------------- | ------------------------------------------------------------------- |
+## | CMK_COMPOSE_FILE       | *Temporary file used for the embedded-TUI*                          |
+## | CMK_DIND               | *Determines whether docker-in-docker is allowed*                    |
+## | CMK_INTERNAL           | *1 if dispatched inside container, otherwise 0*                     |
+## | CMK_SRC:               | path to compose.mk source code                                      |
+## | CMK_SUPERVISOR         | *1 if supervisor/signals is enabled, otherwise 0*                   |
+## | COMPOSE_IGNORE_ORPHANS | *Honored by 'docker compose', this helps to quiet output*           |
+## | DOCKER_HOST_WORKSPACE  | *Needs override for correctly working with DIND volumes*            |
+## | TRACE:                 | 1 if increase verbosity desired (more detailed than verbose)        |
+## | GITHUB_ACTIONS:        | true if running inside github actions, false otherwise              |
+## | verbose:               | 1 if normal debugging output should be shown, otherwise 0           |
+## | __file__:              | val of CMK_SRC if stand-alone mode, invoked file if in library mode |
+## | trace:                 | alias for setting TRACE                                             |
 ##░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 
 export COMPOSE_IGNORE_ORPHANS?=True
@@ -301,8 +304,11 @@ export CMK_COMPOSE_FILE?=.tmp.compose.mk.yml
 export CMK_DIND?=0
 export verbose:=$(shell [ "$${quiet:-0}" == "1" ] && echo 0 || echo $${verbose:-1})
 export CMK_INTERNAL?=0
-export CMK_SRC=$(shell echo ${MAKEFILE_LIST} | sed 's/ /\n/g' | grep compose.mk)
+export CMK_SRC?=$(shell echo ${MAKEFILE_LIST} | sed 's/ /\n/g' | grep compose.mk)
 export CMK_SUPERVISOR?=1
+export CMK_EXTRA_REPO?=.
+export GITHUB_ACTIONS?=false
+export CMK_INTERPRETING?=
 
 ifneq ($(findstring compose.mk, ${MAKE_CLI}),)
 export CMK_LIB=0
@@ -311,6 +317,11 @@ export CMK_SRC=$(findstring compose.mk, ${MAKE_CLI})
 .DEFAULT_GOAL:=help
 else
 export CMK_LIB=1
+ifeq ($(strip ${CMK_INTERPRETING}),)
+export __file__?=$(word 1, $(MAKEFILE_LIST))
+else
+export __file__=${CMK_INTERPRETING}
+endif
 export CMK_STANDALONE=0
 .DEFAULT_GOAL:=__main__
 endif
@@ -331,9 +342,7 @@ ifeq ($(shell echo $${CMK_DIND:-0}), 1)
 export workspace?=$(shell echo ${DOCKER_HOST_WORKSPACE})
 export CMK_INTERNAL=0
 endif
-export CMK_EXTRA_REPO?=.
-export GITHUB_ACTIONS?=false
-export CMK_INTERPRETING?=
+
 docker.env.standard=-e DOCKER_HOST_WORKSPACE=$${DOCKER_HOST_WORKSPACE:-$${PWD}} -e TERM=$${TERM:-xterm} -e GITHUB_ACTIONS=${GITHUB_ACTIONS} -e TRACE=$${TRACE}
 
 ifeq (${TRACE},1)
@@ -489,7 +498,7 @@ compose.loadf: tux.require
 	&& $(call log.io, $${header} ${dim}$${msg}) \
 	&& ${trace_maybe} \
 	&& $(call log.trace, $${header} Handing off to generated makefile) \
-	&& $(call mk.yield, env -i HOME=${HOME} make ${MAKE_FLAGS} -f $${tmpf} $${words:-tux.open.service_shells/$${first}})
+	&& $(call mk.yield, ${io.shell.isolated} make ${MAKE_FLAGS} -f $${tmpf} $${words:-tux.open.service_shells/$${first}})
 
 compose.select/%:
 	@# Interactively selects a container from the given docker compose file,
@@ -1711,18 +1720,15 @@ mk.help.target/%:
 	@# USAGE:
 	@#   ./compose.mk mk.help.target/<target_name>
 	@#
-	${make} .mk.help.target/${*} | ${stream.glow}
-.mk.help.target/%:
-	@# Shows raw help for the named target.
-	tmp1=".tmp.$(shell echo `basename ${MAKEFILE}`.parsed.json)" \
+	(tmp1=".tmp.$(shell echo `basename ${MAKEFILE}`.parsed.json)" \
 	&& $(call io.file.gen.maybe,$${tmp1},${make} mk.parse/${MAKEFILE}) \
 	&& $(call io.mktemp) && tmp2="$${tmpf}" \
-	&& export key="${*}" \
+	&& key="${*}" \
 	&& $(call log.mk, ${no_ansi_dim}mk.help.target ${sep} ${dim_cyan}${bold}$${key} ) \
 	&& cat $${tmp1} | ${jq} -r ".[\"$${key}\"].docs[]" 2>/dev/null > $${tmp2} \
 	; case $$? in \
-		0) $(call log.trace, found it) ;; \
-		*) $(call log.trace, missed); cat $${tmp1} | ${jq} -r ".[\"$${key}/%\"].docs[]" 2>/dev/null >$${tmp2};; \
+		0) $(call log.trace, ${@} ${sep} found literal) ;; \
+		*) $(call log.trace, ${@} missed literal); cat $${tmp1} | ${jq} -r ".[\"$${key}/%\"].docs[]" 2>/dev/null >$${tmp2};; \
 	esac \
 	; case "`cat $${tmp2} | ${stream.trim}`" in \
 		"") $(call log.mk,${cyan_flow_right} ${dim_ital}No help found.);; \
@@ -1730,7 +1736,7 @@ mk.help.target/%:
 	; case $$? in \
 		0) cat $${tmp2} ;; \
 		*) $(call log.mk, ${cyan_flow_right} No such target was found.);; \
-	esac 
+	esac) | ${stream.glow}
 
 help.local:
 	@# Renders help for all local targets, i.e. just the ones that do NOT come from includes.
@@ -1950,7 +1956,7 @@ mk.interpret!:
 	&& $(call io.mktemp) \
 	&& fname="`echo $${cli}| cut -d' ' -f1`" \
 	&& $(call log.mk, ${@} ${sep} compiling ${sep} ${dim}file=${underline}$${fname}${no_ansi}) \
-	&& $(call log.mk, ${@} ${cyan_flow_right} ${dim_ital}$${rest:-}) \
+	&& [ -z "$${rest}" ] && true || $(call log.mk, ${@} ${cyan_flow_right} ${dim_ital}$${rest:-}) \
 	&& cat $${fname} | ${make} mk.compile > $${tmpf} \
 	&& chmod ugo+x $${tmpf} \
 	&& ${trace_maybe} \
@@ -1993,8 +1999,9 @@ mk.interpret/%:
 	> $${tmpf} \
 	&& ${make} mk.validate/$${tmpf} \
 	&& $(call log.trace, mk.interpret ${sep} ${dim_ital}$${continuation:-(no additional arguments passed)}) \
-	&& chmod ugo+x $${tmpf} \
-	&& CMK_INTERPRETING=$${CMK_INTERPRETING:-$${fname}} MAKEFILE=$${tmpf} $${tmpf} $${continuation:-}
+	&& chmod +x $${tmpf} \
+	&& CMK_INTERPRETING=$${CMK_INTERPRETING:-$${fname}} MAKEFILE=$${tmpf} \
+		stdbuf -o0 -e0 $${tmpf} $${continuation:-}
 
 mk.validate/%:
 	@# Validate the given Makefile (using `make -n`)
@@ -2114,7 +2121,10 @@ mk.require.tool/%:; $(call _mk.require.tool, ${*})
 	@# Output is only on stderr, but this shows whereabouts if it is in PATH.
 	@# If not found, this exits with an error.  Also available as a macro.
 # Helper for asserting that tools are available with support for error messages.
+# Alias for CMK-lang: 
+#  USAGE: cmk.require.tool(tool_name, Error if missing)
 _mk.require.tool=$(call log.part1,${GLYPH_IO} Looking for ${1} in path); which ${1} >/dev/null && $(call log.part2,${green}${GLYPH_CHECK} ${no_ansi_dim}`which ${1}`) || ($(call log.part2,${red} missing!);$(call log.io,${no_ansi}${bold}Error:${no_ansi} $(if $(filter undefined,$(origin 2)),Install tool and retry workflow.,$(2))); exit 1)
+require.tool=${_mk.require.tool}
 
 mk.run/%:; ${io.shell.isolated} make -f ${*} 
 	@# A target that runs the given makefile.
@@ -2129,7 +2139,8 @@ mk.select/%:
 	@#
 	choices=`${make} mk.targets.simple/${*} | ${stream.nl.to.space}` \
 	&& header="Choose a target:" && ${io.get.choice} \
-	&& env -i PATH=$${PATH} HOME=$${HOME} bash -x -c "make -f ${*} $${chosen}"
+	&& ${io.shell.isolated} bash ${dash_x_maybe} -c "make -f ${*} $${chosen}"
+# && env -i PATH=$${PATH} HOME=$${HOME} bash -x -c "make -f ${*} $${chosen}"
 
 mk.targets/% mk.parse.shallow/%:
 	@# Returns only local targets from the given file, ignoring includes.
@@ -5303,9 +5314,12 @@ flux.post/%:
 
 define .awk.rewrite.targets.maybe 
 {
-  if ($0 ~ /help/ || $0 ~ /jb/ || $0 ~ /yq/ || $0 ~ /jq/ || $0 ~ /mk.interpret/ || $0 ~ /mk.include/ || $0 ~ /loadf/) {
-	print $0
-	next }
+  if ($0 ~ /help/ || $0 ~ /jb/ || $0 ~ /yq/ || $0 ~ /jq/ || $0 ~ /mk.include/ || $0 ~ /loadf/) {
+    print $0
+    next }
+  if ($0 ~ /mk.interpret/ ) {
+    print $0
+    next }
   result = ""
   for (i=1; i<=NF; i++) {
     if ($i ~ /^\./ || $i ~ /\//) {result = result " " $i; continue}
