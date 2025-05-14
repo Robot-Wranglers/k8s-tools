@@ -57,6 +57,7 @@ nav:
     - 'Index of Demos': demos/index.md
     - 'Basic Cluster Lifecycle': demos/cluster-lifecycle.md
     - 'Multi-Cluster Networking': demos/multicluster.md
+    - 'Traffic Management': demos/istio.md
     - 'Debugging with Kubetail': demos/kubetail.md
     - 'Argo Workflows Example': demos/argo-wf.md
     - 'FaaS with Fission': demos/fission.md
