@@ -64,7 +64,7 @@ services:
         RUN chown -R ${DOCKER_UID:-1000}:${DOCKER_GID:-1000} /home/${DOCKER_UGNAME:-root}/
         RUN curl -sL https://raw.githubusercontent.com/holman/spark/master/spark -o /usr/bin/spark && chmod ugo+x /usr/bin/spark
         RUN apk -q --no-cache add docker docker-compose
-        RUN curl -sLo /usr/local/bin/kubetail https://github.com/kubetail-org/kubetail/releases/download/cli-${KUBETAIL_VERSION:-v0.5.2}/kubetail-linux-amd64
+        RUN curl -fsLo /usr/local/bin/kubetail https://github.com/kubetail-org/kubetail/releases/download/cli%2F${KUBETAIL_VERSION:-v0.5.2}/kubetail-linux-amd64
         RUN chmod o+x /usr/local/bin/kubetail
         USER ${DOCKER_UGNAME:-root}
         ENV PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/home/${DOCKER_UGNAME:-root}/.krew/bin
@@ -110,11 +110,12 @@ services:
 
   kubetail:
     <<: *base
-    hostname: k8s:kubetail 
+    hostname: k8s:kubetail
+    depends_on: ['k8s']
     command: >- 
       sh -x -c "kubetail serve --skip-open \
       --kubeconfig /home/${DOCKER_UGNAME:-root}/.kube/config \
-      --port ${KUBETAIL_PORT:-9876} "
+      --port ${KUBETAIL_PORT:-9876}"
     # --host 0.0.0.0
     build: 
       context: . 
@@ -126,6 +127,7 @@ services:
     <<: *base
     hostname: k8s:minikube 
     entrypoint: minikube 
+    depends_on: ['k8s']
     build: 
       context: . 
       tags: ['k8s:minikube']
@@ -133,7 +135,8 @@ services:
         FROM k8s:base AS base
         USER root
         RUN apk -q --no-cache add libc6-compat
-        RUN curl -sLo /usr/local/bin/minikube https://github.com/kubernetes/minikube/releases/latest/download/minikube-linux-amd64
+        RUN curl -fsLo /usr/local/bin/minikube https://github.com/kubernetes/minikube/releases/download/${MINIKUBE_VERSION:-v1.35.0}/minikube-linux-amd64
+
         RUN chmod o+x /usr/local/bin/minikube
         USER ${DOCKER_UGNAME:-root}
 

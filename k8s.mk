@@ -311,7 +311,9 @@ fission.assert.env/%:; $(call containerized.maybe, fission)
 	@# Succeeds only when the given environment exists 
 	@# for the currently active namespace.  No output.
 .fission.assert.env/%:;
-	fission env list | awk '{print $$1}' | tail -n+2 | grep ${*} > /dev/null
+	fission env list \
+		| awk '{print $$1}' \
+		| tail -n+2 | grep ${*} 2> /dev/null >/dev/null
 
 fission.env.create/%:; $(call containerized.maybe, fission)
 	@# Creates the named fission environment if it doesn't already exist.
@@ -673,26 +675,26 @@ kubectl.pod.shell/%:
 	&& kubectl exec \
 		-n $${namespace} -it $${pod_name} -- $${ishell}
 
-k8s.get/% kubectl.get/%:; $(call containerized.maybe, k8s)
-.k8s.get/% .kubectl.get/%:
-	@# Returns resources under the given namespace, for the given kind.
-	@# This can also be used with a 'jq' query to grab deeply nested results.
-	@# Pipe Friendly: results are always JSON.  Caller should handle errors.
-	@#
-	@# USAGE: 
-	@#	 ./k8s.mk kubectl.get/<namespace>/<kind>/<resource_name>/<jq_filter>
-	@#
-	@# Argument for 'kind' must be provided, but may be "all".  
-	@# Argument for 'filter' is optional.
-	@#
-	$(eval export pathcomp:=$(shell echo ${*}| sed -e 's/\// /g'))
-	$(eval export namespace:=$(strip $(shell echo ${*} | awk -F/ '{print $$1}')))
-	$(eval export kind:=$(strip $(shell echo ${*} | awk -F/ '{print $$2}')))
-	$(eval export name:=$(strip $(shell echo ${*} | awk -F/ '{print $$3}')))
-	$(eval export filter:=$(strip $(shell echo ${*} | awk -F/ '{print $$4}')))
-	export cmd_t="kubectl get $${kind} $${name} -n $${namespace} -o json | jq -r $${filter}" \
-	&& $(call log.k8s, kubectl.get${no_ansi_dim} // $${cmd_t}) \
-	&& eval $${cmd_t}
+# k8s.get/% kubectl.get/%:; $(call containerized.maybe, k8s)
+# .k8s.get/% .kubectl.get/%:
+# 	@# Returns resources under the given namespace, for the given kind.
+# 	@# This can also be used with a 'jq' query to grab deeply nested results.
+# 	@# Pipe Friendly: results are always JSON.  Caller should handle errors.
+# 	@#
+# 	@# USAGE: 
+# 	@#	 ./k8s.mk kubectl.get/<namespace>/<kind>/<resource_name>/<jq_filter>
+# 	@#
+# 	@# Argument for 'kind' must be provided, but may be "all".  
+# 	@# Argument for 'filter' is optional.
+# 	@#
+# 	$(eval export pathcomp:=$(shell echo ${*}| sed -e 's/\// /g'))
+# 	$(eval export namespace:=$(strip $(shell echo ${*} | awk -F/ '{print $$1}')))
+# 	$(eval export kind:=$(strip $(shell echo ${*} | awk -F/ '{print $$2}')))
+# 	$(eval export name:=$(strip $(shell echo ${*} | awk -F/ '{print $$3}')))
+# 	$(eval export filter:=$(strip $(shell echo ${*} | awk -F/ '{print $$4}')))
+# 	export cmd_t="kubectl get $${kind} $${name} -n $${namespace} -o json | jq -r $${filter}" \
+# 	&& $(call log.k8s, kubectl.get${no_ansi_dim} // $${cmd_t}) \
+# 	&& eval $${cmd_t}
 
 k8s.namespace.purge.by.prefix/%:
 	@# Runs a separate purge for every matching namespace.
@@ -840,7 +842,7 @@ k8s.namespace.purge/%:; $(call containerized.maybe, kubectl)
 	${trace_maybe} \
 	&& kubectl delete namespace --cascade=foreground ${*} -v=9 2>/dev/null || true
 
-k8s.namespace.wait/%:; ${make} k8s.dispatch.quiet/kubectl.namespace.wait/${*}
+k8s.namespace.wait/%:; $(call containerized.maybe, kubectl)
 	@# Waits for every pod in the given namespace to be ready.
 	@#
 	@# This uses only kubectl/jq to loop on pod-status, but assumes that 
@@ -854,6 +856,7 @@ k8s.namespace.wait/%:; ${make} k8s.dispatch.quiet/kubectl.namespace.wait/${*}
 	@#
 	@# REFS:
 	@#   * `[1]`: https://github.com/alecjacobs5401/kubectl-sick-pods
+.k8s.namespace.wait/%:; ${make} kubectl.namespace.wait/${*}
 .wait_cmd="gum \
 	spin --spinner $${spinner:-jump} \
 	--spinner.foreground=$${color:-39} \
@@ -872,16 +875,25 @@ k8s.namespace.wait/%:; ${make} k8s.dispatch.quiet/kubectl.namespace.wait/${*}
 	done \
 
 set_scope=scope=`[ "${*}" == "all" ] && echo "--all-namespaces" || echo "-n ${*}"`
-.format.pod_columns=custom-columns=NAME:.metadata.name,READY:.status.containerStatuses[*].ready,STATUS:.status.phase,RESTARTS:.status.containerStatuses[*].restartCount
 .format.header=awk 'NR==1{print "${dim_cyan}${bold}" $$0 "${no_ansi_dim}";next}{print $$0}'
 k8s.pods k8s.pods.all: k8s.pods/all
 	@# Returns information about pods in all namespaces.  
 	@# Not for parsing; this info is human friendly, and output to logging channel.
 k8s.pods/%:; $(call containerized.maybe, k8s)
-	@# Shows human pods for all namespaces, excluding ones with "completed" status.
+	@# Shows pods for the given namespace, excluding ones with "completed" status.
 	@# Not for parsing; this info is human friendly, and output to logging channel.
 .k8s.pods/%:; ${make} kubectl.pods/${*}
 k8s.pods.watch:; entrypoint=watch cmd="-n1 kubectl get po -A" ${make} k8s
+
+k8s.svc/%:; $(call containerized.maybe, k8s)
+	@# Shows services for the given namespace
+	@# Not for parsing; this info is human friendly, and output to logging channel.
+.k8s.svc/%:; ${make} kubectl.svc/${*}
+
+k8s.deployments/%:; $(call containerized.maybe, k8s)
+	@# Shows deployments for the given namespace
+	@# Not for parsing; this info is human friendly, and output to logging channel.
+.k8s.deployments/%:; ${make} kubectl.deployments/${*}
 
 k8s.ready k8s.cluster.ready:; $(call containerized.maybe, k8s)
 	@# Checks whether the cluster is available.  
@@ -1097,6 +1109,7 @@ kubectl.kubectx:
 	$(call log.k8s, ${@} ${sep} ${no_ansi_dim}Showing cluster context)
 	kubectx | ${stream.indent} 
 
+kubectl.wait: kubectl.namespace.wait/all
 kubectl.namespace.wait/%:
 	@# FIXME: use ${set_scope}
 	${set_scope} \
@@ -1141,7 +1154,24 @@ kubectl sick-pods $${scope} 2>&1 \
 	| tr '☂' '\n' 2>/dev/null | ${stream.dim} > ${stderr} \
 && printf '\n'>/dev/stderr 
 endef
+k8s.get.svc/%:; $(call containerized.maybe, k8s)
+	@#
+	@# USAGE:
+	@#   k8s.get.svc/<ns>/<name>/<filter>
+	@#   k8s.get.svc/ab-testing/coin-service/.spec.clusterIP
+.k8s.get.svc/%:; ${make} kubectl.get.svc/${*}
 
+kubectl.get=kubectl get $${kind} -n $${ns} $${id} -o json | ${jq} -re $${jsonpath}
+kubectl.get.svc/%:
+	@#
+	@# USAGE:
+	@#   kubectl.get.svc/<ns>/<name>/<filter>
+	@#   kubectl.get.svc/ab-testing/coin-service/.spec.clusterIP
+	@#
+	ns=`echo ${*}|cut -d/ -f1` \
+	&& id=`echo ${*}|cut -d/ -f2` \
+	&& jsonpath=`echo ${*}|cut -d/ -f3-` \
+	&& kind=svc && ${kubectl.get}
 kubectl.namespace.create/%:
 	@# Idempotent version of namespace-create.
 	@#
@@ -1161,17 +1191,30 @@ kubectl.namespace.list:
 		| ${jq} -r '.items[].metadata.name'
 
 kubectl.pods/%:
-	@#
-	${set_scope} \
-	&& ( kubectl get pods $${scope} \
-			--field-selector=status.phase!=Completed \
-			-o "${.format.pod_columns}" | ${.format.header} \
-		) | ${stream.as.log}
-kubectl.pod.get/%:; kubectl get pod ${*} -o JSON
-	@#
+	@# Show deployments in the given namespace
+	kind=pod \
+	kubectl_extra="\
+		--field-selector=status.phase!=Completed \
+		-o custom-columns=NAME:.metadata.name,READY:.status.containerStatuses[*].ready,STATUS:.status.phase,RESTARTS:.status.containerStatuses[*].restartCount" \
+	${make} kubectl.show/${*}
 
-kubectl.pods.get:; kubectl get pod ${*} -o JSON
-	@#
+kubectl.show/%:
+	@# Show the given types in the given namespace
+	$(call log.k8s, kubectl.show ${sep} ${dim}ns=${dim_green}${*} ${sep} ${dim}kind=${no_ansi}${bold}$${kind}) \
+	&& ${trace_maybe} \
+	&& ( kubectl get $${kind} \
+			-n ${*} \
+			$${kubectl_extra:-} \
+		) | ${.format.header} | ${stream.as.log}
+
+kubectl.deployments/%:; kind=deployments ${make} kubectl.show/${*}
+	@# Show deployments in the given namespace
+	
+kubectl.svc/%:; kind=svc ${make} kubectl.show/${*}
+	@# Show services in the given namespace
+
+# kubectl.pod.get/%:; kubectl get pod ${*} -o JSON
+# kubectl.pods.get:; kubectl get pod ${*} -o JSON
 
 kubectl.stat.auth:
 	$(call log.k8s, ${@} ${sep}${dim} kubectl auth whoami )
@@ -1179,6 +1222,9 @@ kubectl.stat.auth:
 		kubectl auth whoami -ojson 2>/dev/null \
 		|| printf "${yellow}Failed to retrieve auth info with command:${no_ansi_dim} kubectl auth whoami -ojson${no_ansi}"` \
 	&& printf "$${auth_info}\n"| jq .
+
+istio.virtualservices/%:; $(call containerized.maybe, k8s)
+.istio.virtualservices/%:; kind=virtualservice ${make} kubectl.show/${*}
 
 #░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 ## END: k8s.* targets
@@ -1282,7 +1328,7 @@ kubefwd.start/% k8s.namespace.fwd/%:
 	&& $(call log.k8s, kubefwd ${sep} ${dim}cmd=${no_ansi}$${fwd_cmd}) \
 	&& $(call io.mktemp) \
 	&& bash -x -c "$${fwd_cmd_wrapped} > $${tmpf}" \
-	&& cid="`cat $${tmpf}|${stream.trim}`" \
+	&& cid="`cat $${tmpf} | ${stream.trim}`" \
 	&& cmd="docker logs -f $${cname}" timeout=3 ${make} flux.timeout.sh 
 
 #░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░

@@ -1,21 +1,48 @@
 ## Automation With k8s.mk
 <hr style="width:100%;border-bottom:3px solid black;">
 
-As an automation library or stand-alone tool, `k8s.mk` can help to create project-specific APIs that use the tool containers described in `k8s-tools.yml`.  Most of what's offered is in the form of **targets**, which you can directly use from the command line, or use as part of normal tasks/prereqs inside your project Makefile.  In other words, **the API and the CLI are the same**.  
+As an automation library or stand-alone tool, `k8s.mk` can help to create project-specific APIs that use the tool containers described in `k8s-tools.yml`.  Most of what's offered is in the form of **make targets**, which you can directly use from the command line, or use as part of normal tasks/prereqs inside a project Makefile.  
 
-Many targets are [scaffolded](#tool-container-basics), i.e. automatically generated for each tool container that's available.  Others targets are static, basically composing more primitive functionality to make it suitable for orchestration tasks.  Static targets usually fall into one of a few basic categories:
+In other words, **the internal automation API and the CLI are the same**.
 
-1. **Reusable implementations for common cluster automation tasks,** like [waiting for pods to get ready](/k8s-tools/api#k8s.wait)
-1. **Context-management tasks,** (like [setting the currently active namespace](/k8s-tools/api#k8snamespacearg))
-1. **Interactive debugging tasks,** (like [shelling into a new or existing pod inside some namespace](/k8s-tools/api#k8sshellarg))
+Let's look at a quick example of that before we get into the rest of the background.  Suppose you want to wait for your cluster to settle before you do something else.  If you're working interactively or scripting with bash, you might just want a shell command:
+
+``bash
+
+# Blocks until there are no pods with status=waiting
+$ KUBECONFIG=.. ./k8s.mk k8s.wait
+```
+
+If this is part of a bigger orchestration project, you might put this in your project Makefile
+
+```Makefile linenums="1"
+
+deploy: deploy.infrastructure deploy.app
+deploy.app: k8s.wait
+	kubectl ..
+```
 
 --------------------------------
 
-This section is a quick overview of some of the capabilities, using a combination of working CLI-style examples, and *snippets* of scripts to illustrate ideas.
+Many targets are [scaffolded](#tool-container-basics), i.e. automatically generated for each tool container that's available.  Others targets are static, basically composing primitive functionality to make it more suitable for orchestration tasks.  
 
-If you're looking instead for an API reference, [that is here](/k8s-tools/api/#api-k8smk)).
+**Static targets** usually fall into one of a few basic categories:
+:   * Context-management tasks, such as 
+        * [setting the active namespace](/k8s-tools/api#k8snamespacearg)
+        * [setting the active kube context](#placeholder)
+    * Interactive debugging tasks, such as
+        * [browsing logs](#placeholder)
+        * [shelling into a new or existing pod inside some namespace](/k8s-tools/api#k8sshellarg)
+        * [quick custom metrics displays](#placeholder)
+    * Reusable implementations for common cluster automation tasks, such as
+        * [placeholder](#placeholder)
+        * [waiting for pods to get ready](/k8s-tools/api#k8s.wait)
+        * [grabbing data to send it elsewhere](#placeholder)
 
-If you want to focus on scripting and prefer to see **concrete end-to-end examples**, start instead with the demos, such as the [Cluster Lifecycle Demo](/k8s-tools/demos#demo-cluster-automation).
+**Scaffolded targets** are focused on the standard docker compose container verbs, such as *run / exec / up / down*, plus what you might call *mapping and dispatch*, which involves running existing make-targets inside existing tool containers.  The effect of this is basically similar to "jobs" in github actions, or "agents" in jenkins.
+
+--------------------------------
+
 
 ### Tool Container Basics
 <hr style="width:100%;border-bottom:3px solid black;">
@@ -54,7 +81,6 @@ lazydocker
 minikube
 promtool
 rancher
-registry-mirror
 subctl
 tui
 ```

@@ -3,10 +3,10 @@
 #   Demonstrating multicluster networking with minikube, calico, 
 #   and submariner.  Verbs include: create, destroy, deploy, etc.
 #   
-# This demo ships with the `k8s-tools` repository and runs as part of the 
-# test-suite.  See the documentation here[1] for more discussion.  Note that
-# repeatedly setting up calico can quickly run into rate-limiting with docker.io,
-# and you might want to setup a local registry mirror [2]
+# See the documentation here[1] for more discussion.
+# This demo ships with the `k8s-tools` repo and runs as part of the test-suite.
+# Note that repeatedly setting up calico can quickly run into rate-limiting 
+# with docker.io, and you might want to setup a local registry mirror [2]
 #
 # USAGE: 
 #
@@ -138,7 +138,6 @@ test.app: k8s.dispatch/.test.app
 	&& $(call log.k8s, ${@} ${sep} Checking east-to-west connectivity..) \
 	&& kubectl exec --context east -i $${eastern} -- \
 		curl -sS $${west_pod} | ${stream.nl.compress} | ${stream.as.log}
-
 
 define calico.installation.yml
 apiVersion: operator.tigera.io/v1

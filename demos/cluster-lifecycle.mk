@@ -4,9 +4,9 @@
 #   Demonstrating full cluster lifecycle automation with k8s-tools.git.
 #   This exercises `compose.mk`, `k8s.mk`, plus the `k8s-tools.yml` services to 
 #   interact with a small k3d cluster.  Verbs include: create, destroy, deploy, etc.
-#   
-# This demo ships with the `k8s-tools` repository and runs as part of the test-suite.
+#
 # See the documentation here[1] for more discussion.
+# This demo ships with the `k8s-tools` repo and runs as part of the test-suite.
 #
 # USAGE: 
 #
@@ -24,7 +24,7 @@
 #   ./demos/cluster-lifecycle.mk teardown
 #
 # REF:
-#   [1] https://robot-wranglers.github.io/k8s-tools/demos/cluster-lifecycle/
+#   [1] https://robot-wranglers.github.io/k8s-tools/demos/cluster-lifecycle
 #░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 
 # Boilerplate section.

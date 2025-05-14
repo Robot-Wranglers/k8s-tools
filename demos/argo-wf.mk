@@ -5,9 +5,8 @@
 #   This exercises `compose.mk`, `k8s.mk`, plus the `k8s-tools.yml` services to 
 #   interact with a small k3d cluster.  Verbs include: create, destroy, deploy, etc.
 #   
-# This demo ships with the `k8s-tools` repository and runs as part of the test-suite.
-#
 # See the documentation here[1] for more discussion.
+# This demo ships with the `k8s-tools` repo and runs as part of the test-suite.
 #
 # USAGE: 
 #
@@ -31,8 +30,8 @@
 # Generates target-scaffolding for k8s-tools.yml services
 # Setup the default target that will do everything, end to end.
 #░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+
 include k8s.mk
-cluster.name=argo-wf
 export KUBECONFIG:=./local.cluster.yml
 $(shell umask 066; touch ${KUBECONFIG})
 $(eval $(call compose.import, k8s-tools.yml))
@@ -42,6 +41,8 @@ __main__: clean create deploy test
 # and mostly just setting up aliases for existing targets. 
 # The `stage` usage announces sections, `k3d.*` are library calls.
 #░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+
+cluster.name=argo-wf
 
 clean cluster.clean teardown cluster.teardown: \
 	stage/cluster.clean k3d.cluster.delete/${cluster.name}
@@ -71,9 +72,10 @@ infra.setup: argo.dispatch/.infra.setup cluster.wait
 .infra.setup: k8s.kubens.create/${argo.namespace}
 	kubectl apply -f ${argo.infra_url} | ${stream.as.log}
 
-# Show details about post-deploy pod/service topology,
-# Uses context-managers for namespaces, and lists known workflows.
+
 infra.test: argo.dispatch/.infra.test
+	@# Show details about post-deploy pod/service topology,
+	@# Uses context-managers for namespaces, and lists known workflows.
 	label="Previewing topology for argo namespace" \
 		${make} io.print.banner k8s.graph.tui/${argo.namespace}/pod
 .infra.test: k8s.kubens/${argo.namespace} argo.list

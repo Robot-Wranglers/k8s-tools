@@ -166,11 +166,11 @@ $ ./demos/cluster-lifecycle.mk k8s.pod.shell/default/test-harness
 
 # Start a new pod with the given name, in the given namespace,  
 # then shell into it when it's finished bootstrapping.
-$ interactive=1 ./demos/kaniko.mk k8s.test_harness/default/mypod
+$ interactive=1 ./demos/cluster-lifecycle.mk k8s.test_harness/default/mypod
 
 # Like last command, but overrides the default pod image
 $ interactive=1 img=python:3.11-slim-bookworm \
-    ./demos/kaniko.mk k8s.test_harness/default/mypod
+    ./demos/cluster-lifecycle.mk k8s.test_harness/default/mypod
 ```
 
 <br/>
