@@ -3,33 +3,43 @@
 ## Overview
 <hr style="width:100%;border-bottom:3px solid black;">
 
-Meet the **k8s-tools suite**, which aggregates 30+ individual utilities for working with kubernetes into a single dockerized toolchain, and provides an automation framework for extending and interacting it. Project-local clusters, cluster lifecycle automation, customizable TUIs, and more.
+!!! wip "Under Construction"
+    <strong>Docs are a work in progress,</strong> but you'll still find lots of working examples and hands-on tutorials.  This is a sibling project for [compose.mk]({{jinja.vars.composemk_docs_url}}), which is a more general automation framework; The k8s-tools suite serves as a reference implementation for extending it.
 
-{{macros.img_link("e2e-k3d.commander.gif", mkdocs, "90%")}}
+Meet the **k8s-tools suite**, which aggregates 30+ individual utilities for working with kubernetes into a [single dockerized toolchain]({{mkdocs.site_relative_url}}/toolbox), and provides an [automation framework]({{mkdocs.site_relative_url}}/k8s.mk) for extending and interacting it. Project-local clusters, cluster lifecycle automation, customizable TUIs, and more, with no dependencies at all beyond what's already in your dev environment.
 
-**k8s-tools** operates at a project-automation layer and is designed to embrace and extend other tools, so it doesn't really conflict or compete with anything.  It's useful for CI/CD pipelines or prototyping systems and is designed to be [embedded alongside existing projects]({{mkdocs.site_relative_url}}/integration).  By using dockerized versions of `k3d` or `kind`, many operations for "clusters" can use docker for kubernetes nodes, which makes it very easy to run end-to-end tests completely inside your existing CI without any need for external clusters.
+{{macros.img_link("e2e-k3d.commander.gif", mkdocs, "95%")}}
 
-This reference focuses on a few use-cases in particular:
+The k8s-tools suite operates at a project-automation layer that is designed to embrace and extend other tools, so it doesn't really conflict or compete with anything.  It's especially useful for CI/CD pipelines or prototyping systems, and is designed to be [embedded alongside existing projects]({{mkdocs.site_relative_url}}/integration).
 
-1. **Cluster lifecycle / development / debugging workflows** in general.
-1. **Project-local kubernetes clusters & corresponding lifecycle automation** using `kind` or `k3d`.
-1. **Decoupling project automation** from the choice of CI/CD backend.
-1. **Separation of automation tasks** from specifications for runtime / container context.
-1. **Per-project tool-versioning**, providing defaults but allowing overrides, and ensuring versions match everywhere.
-1. **Less shell code in general,** but where we need it: it <u>shouldn't</u> be embedded in YAML, Jenkinsfiles, etc.
+Tool-container definitions use docker-compose, and the automation framework is Makefile-based. 
 
-This is a sibling project for [compose.mk]({{jinja.vars.composemk_docs_url}}), which is a more general automation framework: the k8s-tools suite also serves as a reference implementation for extending it. <font color=red>Docs here are still incomplete and a work in progress,</font> but you'll find lots of working examples and hands-on tutorials.
-
-### Introduction
+### What does it do?
 <hr style="width:100%;border-bottom:3px solid black;">
 
-At a high level, the **k8s-tools suite** has 2 main components that can be used individually or together.  Those components are *a collection of tool-container definitions*, and an *automation framework for extending and interacting with the containers*.
+Individual utilities [in the toolbox]({{mkdocs.site_relative_url}}/toolbox) work as usual on any sort of kubernetes platform, regardless of where or how it's hosted.  But there's also a major emphasis on the kind of [project-local clusters](#) that you might be interested in for local-first development, platform-agnostic end-to-end tests, etc.  To that end, the toolbox incorporates dockerized versions of `k3d`, `kind`, and `minikube`, and [scripting that makes use of those containers]({{mkdocs.site_relative_url}}/k8s.mk) is easy.
 
---------------------------------
+!!! goals "Use Cases:"
+    1. Cluster lifecycle / development / debugging workflows in general.
+    1. Project-local kubernetes clusters & corresponding lifecycle automation.
+    1. Decoupling project automation from the choice of CI/CD backend.
+    1. Separation of automation tasks from runtime / container context specs.
+    1. Per-project tool-versioning, providing defaults but allowing overrides
+    1. Less automation code in general, with what's left being more modular and composable 
+    1. Decoupling and sharing automation, without locking it away inside Jenkinsfiles, Tiltfiles, Github Actions
+
+Another use-case is **actually executable *tutorials / prototypes / PoCs***, somewhat in the spirit of literate programming.  Although some infrastructure-as-code ships with a tidy example repository.. lots of documentation refers to a long list of instructions you're supposed to copy/paste into a terminal, and expects you to bring your own cluster.
+
+This reference aims to collect [**simple, self-contained demos for complex systems,**]({{mkdocs.site_relative_url}}/demos) basically striving for bootstrapping won't pester you to install things first or expect you to bring your own cluster, yet can be extended easily to use remote clusters.
+
+### How does it do it?
+<hr style="width:100%;border-bottom:3px solid black;">
+
+At a high level, the **k8s-tools suite** has 2 main components that can be used individually or together.  Those components are *a collection of tool-container definitions*, and an *automation framework for extending and interacting with the containers*.  
 
 **[`k8s-tools.yml`]({{mkdocs.site_relative_url}}/features)**
 
-:   Aggregates 30+ individual utilities for working with kubernetes into one dockerized toolchain, hosted inside a single docker-compose file.  Official sources are used where possible and containers defined here aren't built from scratch.  Low-level tools (*like `kubectl`, `helm`, etc*) mostly come from [alpine/k8s](https://hub.docker.com/r/alpine/k8s) but [many other tools]({{mkdocs.site_relative_url}}/toolbox) (*like `argo`, `helm`, `knative`, `cdk`, `k9s`, `k3d`, `ansible`, etc*) are also included.  Tools containers are versioned independently, using defaults but allowing overrides, and are pulled only if/when they are used.
+:   Aggregates 30+ individual utilities for working with kubernetes in one place, hosted inside a single docker-compose file.  Official sources are used where possible and containers defined here aren't built from scratch.  Low-level tools (*like `kubectl`, `helm`, etc*) mostly come from [alpine/k8s](https://hub.docker.com/r/alpine/k8s) but [many other tools]({{mkdocs.site_relative_url}}/toolbox) (*like `argo`, `helm`, `knative`, `cdk`, `k9s`, `k3d`, `ansible`, etc*) are also included.  Tools containers are versioned independently, using defaults but allowing overrides, and are pulled only if/when they are used.
 
 **[`k8s.mk`]({{mkdocs.site_relative_url}}/k8s.mk)**
 

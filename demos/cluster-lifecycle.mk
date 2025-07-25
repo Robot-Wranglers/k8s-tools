@@ -1,30 +1,17 @@
 #!/usr/bin/env -S make -f
 #░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
-# demos/cluster-lifecycle.mk: 
-#   Demonstrating full cluster lifecycle automation with k8s-tools.git.
-#   This exercises `compose.mk`, `k8s.mk`, plus the `k8s-tools.yml` services to 
-#   interact with a small k3d cluster.  Verbs include: create, destroy, deploy, etc.
-#   
-# This demo ships with the `k8s-tools` repository and runs as part of the test-suite.
+# Demonstrating full cluster lifecycle automation with k8s-tools.git.
+# This exercises `compose.mk`, `k8s.mk`, plus the `k8s-tools.yml` services to 
+# interact with a small k3d cluster.  Verbs include: create, destroy, deploy, etc.
+#
 # See the documentation here[1] for more discussion.
+# This demo ships with the `k8s-tools` repo and runs as part of the test-suite.
 #
 # USAGE: 
-#
-#   # Default entrypoint runs clean, create, deploy, 
-#   # and tests, but does does not tear down the cluster.  
-#   ./demos/cluster-lifecycle.mk
-#
-#   # End-to-end, again without teardown 
-#   ./demos/cluster-lifecycle.mk clean create deploy test
-#
-#   # Interactive shell for a cluster pod
-#   ./demos/cluster-lifecycle.mk cluster.shell 
-#
-#   # Finally, teardown the cluster
-#   ./demos/cluster-lifecycle.mk teardown
+#	./demos/cluster-lifecycle.mk clean create deploy test
 #
 # REF:
-#   [1] https://robot-wranglers.github.io/k8s-tools/demos/cluster-lifecycle/
+#   [1] https://robot-wranglers.github.io/k8s-tools/demos/cluster-lifecycle
 #░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 
 # Boilerplate section.
@@ -37,22 +24,21 @@
 include k8s.mk
 export KUBECONFIG:=./local.cluster.yml
 $(shell umask 066; touch ${KUBECONFIG})
-$(eval $(call compose.import, k8s-tools.yml))
+$(call compose.import, file=k8s-tools.yml)
+
 __main__: clean create deploy test
 
 # Cluster lifecycle basics.  These are similar for all demos, 
 # and mostly just setting up CLI aliases for existing targets. 
-# The `flux.stage` are just announcing sections, `k3d.*` are library calls.
+# The `stage` are just announcing sections, `k3d.*` are library calls.
 #░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 
 cluster.name=lifecycle-demo
 
-clean teardown cluster.clean: \
-	flux.stage/cluster.clean k3d.cluster.delete/${cluster.name}
-create cluster.create: \
-	flux.stage/cluster.create k3d.cluster.get_or_create/${cluster.name}
-wait cluster.wait: k8s.cluster.wait
-test cluster.test: flux.stage/test.cluster cluster.wait infra.test app.test
+clean: stage/cluster.clean k3d.cluster.delete/${cluster.name}
+create: stage/cluster.create k3d.cluster.get_or_create/${cluster.name}
+wait: k8s.cluster.wait
+test: stage/cluster.test infra.test app.test
 
 # Local cluster details and main automation.
 #░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
@@ -64,15 +50,15 @@ pod_namespace=default
 # to be ready.  Then run a typical example operation with helm with retries,
 # then setup labels and a test-harness, and the prometheus stack
 deploy: \
-	flux.stage/deploy \
-	flux.loop.until/k8s.cluster.ready \
+	stage/deploy \
 	flux.retry/3/deploy.helm \
 	deploy.test_harness \
 	deploy.labels \
 	deploy.grafana
 
-# Add a random label to the default namespace
+
 deploy.labels:
+	@# Add a random label to the default namespace
 	kubectl label namespace default foo=bar
 
 # Run a typical deployment with helm.  Using `helm` directly is 
@@ -167,7 +153,7 @@ grafana.pod_name=prometheus-stack-grafana
 # run inside the helm container.  Note the usage of `grafana.helm.values` to 
 # provide custom values to helm, without any need for an external file.
 deploy.grafana:; $(call containerized.maybe, helm)
-.deploy.grafana: flux.stage/Grafana k8s.kubens.create/${grafana.namespace}
+.deploy.grafana: stage/Grafana k8s.kubens.create/${grafana.namespace}
 	$(call io.log, ${bold}Deploying Grafana)
 	( helm repo add prometheus-community ${grafana.chart.url} \
 	  && helm repo update \
@@ -181,7 +167,7 @@ deploy.grafana:; $(call containerized.maybe, helm)
 
 # Starts port-forwarding for grafana webserver. Working external DNS from host
 fwd.grafana:
-	mapping="${grafana.port_map}" ${make} kubefwd.start/${grafana.namespace}/${grafana.pod_name}
+	kubefwd_mapping="${grafana.port_map}" ${make} kubefwd.start/${grafana.namespace}/${grafana.pod_name}
 	$(call io.log, Connect with: http://admin:prom-operator@grafana:${grafana.host_port}\n)
 fwd.grafana.stop: kubefwd.stop/stop/${grafana.namespace}/${grafana.pod_name}
 
@@ -215,4 +201,4 @@ test.grafana.api:
 
 # Opens an interactive shell into the test-pod.
 # This requires that `deploy.test_harness` has already run.
-cluster.shell: cluster.wait k8s.pod.shell/${pod_namespace}/${pod_name}
+cluster.shell: wait k8s.pod.shell/${pod_namespace}/${pod_name}

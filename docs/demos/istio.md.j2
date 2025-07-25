@@ -1,0 +1,64 @@
+{% import 'macros.j2' as macros -%}
+
+## Traffic Management with Istio
+<hr style="width:100%;border-bottom:3px solid black;">
+
+{% include "includes/demo-common.md.j2" %}
+
+This demo uses `minikube`, `kubectl`, and `istioctl` to setup and exercise traffic shaping.  See also the official docs for istio[^1], and the more specific docs on traffic control[^2].  Note also that minikube actually has an official istio addon[^3], but the approach here avoids that to remain agnostic about the details of cluster-backend.
+
+For this example, we'll implement the standard A/B testing scenario.  The twist is that we're using our distributed system just to create a [(un)fair coin](https://en.wikipedia.org/wiki/Fair_coin) with istio traffic shapping.  There are two services, Alice and Bob.  Alice *always* returns heads, and Bob *always* returns tails.  An istio virtual-service represents the coin toss itself, and we adjust coin fairness by adjust the traffic control policy.
+
+### Basic Usage
+<hr style="width:100%;border-bottom:3px solid black;">
+
+Running the demo is simple: 
+
+```bash {.cli_example}
+# Default entrypoint runs clean, create, 
+# deploy, test, but does not tear down the cluster. 
+$ ./demos/istio.mk
+```
+{{macros.img_link("istio.png", mkdocs, "33%",class='cli_output')}}
+
+
+For the first run of the stuff above, you can already see two trials.  The first one runs with a 50/50 traffic split between Alice and Bob, and the second test runs with a 95/5 split.  You can change the split again and re-execute the trial run like this:
+
+```bash {.cli_example}
+# Change traffic-split to 80 / 20, and rerun tests to confirm
+$ ./demos/istio.mk app.traffic.policy/80,20 app.run.trials
+```
+```bash {.cli_output}
+```
+
+### End-to-End Output
+<hr style="width:100%;border-bottom:3px solid black;">
+
+The following *(large)* image shows the full output of `./demos/submariner.mk clean create deploy test teardown`.  
+
+
+```bash {.cli_example}
+# End-to-end, again without teardown
+$ ./demos/istio.mk clean create deploy test
+```
+
+#### Source Code
+<hr style="width:95%;border-bottom:1px dashed black;">
+
+{{macros.embed_demo(
+    'demos/istio.mk', 
+    github=github)}}
+
+{#
+
+### Conclusion
+<hr style="width:100%;border-bottom:3px solid black;">
+
+Placeholder
+#}
+
+<hr style="width:100%;border-bottom:3px solid black;">
+
+[^1]: [https://istio.io/](https://istio.io/latest/)
+[^2]: Official docs [for istio traffic management](https://istio.io/latest/docs/concepts/traffic-management/#virtual-service-example)
+[^3]: [istio addon](https://minikube.sigs.k8s.io/docs/handbook/addons/istio/)

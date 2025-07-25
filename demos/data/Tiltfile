@@ -1,0 +1,93 @@
+# Docs: https://docs.tilt.dev/api.html
+
+print("🚀 Hello, World from Tilt!")
+
+## Must match the cluster-name that minikube is using.
+allow_k8s_contexts('tilt')
+
+### Demonstrate other tiltfile primitives, check out the cluster.
+print({"context":k8s_context(), "namespace":k8s_namespace()})
+local('kubectl get nodes')
+
+######## Cluster debugging ########
+local_resource(
+    'cluster-info',
+    cmd='''
+printf "\n=== CLUSTER INFORMATION ===\n"
+printf "Kubernetes Version:\n"
+kubectl version --short 2>/dev/null || printf "Could not get version info"
+printf "\n=== NODE DETAILS ===\n"
+kubectl get nodes -o wide
+printf "\n=== NODE RESOURCE USAGE ===\n"
+kubectl top nodes 2>/dev/null || printf "Metrics server not available\n"
+printf "\n=== CLUSTER CAPACITY ===\n"
+kubectl describe nodes | grep -E "cpu:|memory:" | head -20
+printf "\n=== STORAGE CLASSES ===\n"
+kubectl get storageclass
+printf "\n=== NAMESPACES ===\n"
+kubectl get namespaces
+printf "\n=== DEFAULT NAMESPACE ===\n"
+kubectl get pods -n default
+printf "\n=== SERVICES ===\n"
+kubectl get services --all-namespaces
+printf "\n=== CLUSTER EVENTS (Last 10) ===\n"
+kubectl get events --sort-by='.lastTimestamp' | tail -10
+    ''',
+    auto_init=True, labels=['debug'],
+    trigger_mode=TRIGGER_MODE_MANUAL,
+)
+
+######## Resource monitoring ########
+local_resource(
+    'pod-status',
+    cmd='''
+printf "\n=== POD STATUS SUMMARY ===\n"
+kubectl get pods -o wide
+printf "\n=== RESOURCE USAGE (metric-servers) ===\n"
+kubectl top pods 2>/dev/null || printf "Metrics server not available - install with: kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml"
+printf "\n=== HELM RELEASES ===\n"
+helm list --all-namespaces
+    ''',
+    auto_init=False, labels=['debug'],
+    trigger_mode=TRIGGER_MODE_MANUAL,
+)
+
+######## Node debugging details ########
+local_resource(
+    'node-debug',
+    cmd='''
+printf "=== DETAILED NODE INFORMATION ===\n"
+for node in $(kubectl get nodes -o jsonpath='{.items[*].metadata.name}'); do
+    printf "--- Node: $node ---"
+    kubectl describe node $node | grep -A 5 -B 5 -E "(Capacity|Allocatable|Allocated resources|Resource.*Requests.*Limits)"
+    printf ""
+done
+printf "=== NODE CONDITIONS ===\n"
+kubectl get nodes -o custom-columns=NAME:.metadata.name,STATUS:.status.conditions[-1].type,REASON:.status.conditions[-1].reason
+    ''',
+    auto_init=False, labels=['debug'],
+    trigger_mode=TRIGGER_MODE_MANUAL,
+)
+
+######## Networking debug ########
+local_resource(
+    'network-debug',
+    cmd='''
+printf "\n=== NETWORK INFORMATION ===\n"
+kubectl get endpoints
+printf "\n=== INGRESS RESOURCES ===\n"
+kubectl get ingress --all-namespaces 2>/dev/null || printf "No ingress resources found"
+printf ""
+printf "=== NETWORK POLICIES ==="
+kubectl get networkpolicies --all-namespaces 2>/dev/null || printf "No network policies found"
+    ''',
+    auto_init=False, labels=['debug'],
+    trigger_mode=TRIGGER_MODE_MANUAL,
+)
+
+print("\n\n📊 Cluster debugging resources available:")
+print("  - cluster-info: General cluster information (auto-runs)")
+print("  - pod-status: Pod and resource monitoring (manual trigger)")
+print("  - node-debug: Detailed node resource information (manual trigger)")
+print("  - network-debug: Network configuration details (manual trigger)")
+print("\n\n💡 Trigger manual debug resources in Tilt UI or with: tilt trigger <resource-name>")

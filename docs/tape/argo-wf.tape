@@ -9,7 +9,7 @@ Set Height 7000
 Set TypingSpeed .21
 Set PlaybackSpeed 3
 Set CursorBlink false
-Type "./demos/argo-wf.mk clean create deploy test teardown"
+Type "./demos/argo-wf.mk clean create deploy test"
 Enter
-Sleep 880
+Sleep 560
 Screenshot img/argo-wf.png

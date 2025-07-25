@@ -1,0 +1,58 @@
+{% import 'macros.j2' as macros -%}
+
+## Working with Terraform
+<hr style="width:100%;border-bottom:3px solid black;">
+
+{% include "includes/demo-common.md.j2" %}
+
+Terraform is great, check out the official docs.[^1]
+
+Managing multiple versions of terraform or using a dockerized version of terraform is pretty easy to do in a variety of ways, from a variety of execution contexts.  As an automation framework, `k8s.mk` can do that too[^2] and avoid a terraform dependency on the host, which might be useful if you're just testing things out.  But.. most likely if you're using terraform at all then you're also already comfortable with a tool like terragrunt[^3] or Atlantis[^4].  
+
+For power users, there are a few other use-cases that might be more interesting.  This demo looks at two of the more unique possibilities with `k8s.mk`+terraform:
+
+[Stateless operations](#), 
+: Where we avoid avoid additional directories and even files.  This is kind of like fire-and-forget HCL and allows you to scriptify snippets, and quickly build tools or APIs.  For example you can use this to expose data-resources to other tools, or quickly expose a CLI api to start jobs that are tracked by some other system. (See the first demo)
+
+[Polyglots and hybrids](#),
+: Easily mix terraform with other languages/systems, for hybrid or heterogenous deployment automation.  Pass data between other tool containers, all in the same file, without any need to define external registries or repositories. (See the 2nd demo)  
+
+### Source Code
+<hr style="width:100%;border-bottom:3px solid black;">
+
+{{macros.embed_demo(
+    'demos/terraform.mk', 
+    github=github)}}
+
+{{macros.embed_demo(
+    'demos/terraform-2.mk', 
+    github=github)}}
+
+### Basic Usage
+<hr style="width:100%;border-bottom:3px solid black;">
+
+Cluster lifecycle looks more or less the same as any of the other demos.
+
+```bash {.cli_example}
+# Default entrypoint runs clean, create, 
+# deploy, test, but does not tear down the cluster. 
+$ ./demos/terraform.mk clean create
+```
+
+```bash {.cli_example}
+# As part of `deploy`, `tilt up` will run.
+$ ./demos/terraform.mk deploy
+
+# In this case, test just retrieves logs for tilt, 
+# then drops a link for web UI so you can test.
+$ ./demos/terraform.mk test
+```
+
+```bash {.cli_example}
+# Stop the daemonizes tilt-server, tear down the cluster.
+$ ./demos/terraform.mk minio.stop clean
+```
+
+<hr style="width:100%;border-bottom:3px solid black;">
+
+[^1]: [https://terraform.io/](https://terraform.io/)

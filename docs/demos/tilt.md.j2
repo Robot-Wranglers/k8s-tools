@@ -1,0 +1,79 @@
+{% import 'macros.j2' as macros -%}
+
+## Tilting
+<hr style="width:100%;border-bottom:3px solid black;">
+
+{% include "includes/demo-common.md.j2" %}
+
+Tilt is great, check out the official docs.[^1]  The local development experience is especially good, with automatic reloading and slick web-UI that makes it very easy to navigate services, logs, and identify problems in complex bootstrap.  Depending on your interests, you can also pretty quickly build out diagnostic suites, small smoke-test suites, simple event-triggering, etc, with UI components generated from code.
+
+The main problems with Tilt are: 
+
+1. Tilt kind of emphasizes "local-only"[^2], not local-first.
+1. And yet.. it also doesn't work *by itself* locally, so you need another orchestration layer.[^3]
+1. In some ways, it also seems to resist automation and proper daemonization[^4].
+
+Some of these "problems" are arguably good design, but.. it does mean that tilt expects other tools to handle orchestration at some point.[^5]
+
+There's a few ways that `k8s.mk` can help here.  Besides [a container spec for tilt]({{mkdocs.site_relative_url}}/toolbox), there's easy access to cluster lifecycle automation with [k3d]({{mkdocs.site_relative_url}}/api/#api-k3d), [minikube]({{mkdocs.site_relative_url}}/api/#api-minikube), or [kind]({{mkdocs.site_relative_url}}/api/#api-minikube), without any host dependencies besides docker+make.  Run tilt anywhere (including from CI/CD), without actually having tilt installed.  Besides putting related automation together, you can also [easily override versions]({{mkdocs.site_relative_url}}/toolbox) for tilt or minikube from one place.
+
+### Combos & Caveats
+<hr style="width:100%;border-bottom:3px solid black;">
+
+This is a basic demo, just enough to show some orchestration.  For a more complete workbench, it combines well with the [kubetail demo]({{mkdocs.site_relative_url}}/demos/kubetail/).  Although Tilt does have some native support for docker-compose, using it even for prototyping tends to break the similarity for dev/prod, which is something that's nice to have.  Instead consider combining with the [kompose demo]({{mkdocs.site_relative_url}}/demos/kompose/), and you'll have a pretty close match no matter what backend cluster tech you're using.
+
+Tilt support in `k8s.mk` is basic: *most of the tilt CLI commands that interact with the tilt API don't work* from the containerized version of tilt currently.  The main use-cases are fixing daemonization/automation[^4], using `tilt up` without requiring a tilt installation, and getting to the tilt web UI for everything else.
+
+Bonus: Besides running tilt from `k8s.mk`, you can also run `k8s.mk` from Tiltfiles.  Doing this has basically the same benefits as using `k8s.mk` from Jenkins or github-actions, and you may find that helps to decouple your automation from a specific platform at the same time as it makes it more usable from *all* platforms.
+
+#### Source Code
+<hr style="width:100%;border-bottom:3px solid black;">
+
+Just a few lines to handle cluster details and lifecycle automation aliases, and a few to start and daemonize the tilt server while looking at an external Tiltfile:
+
+{{macros.embed_demo(
+    'demos/tilt.mk', 
+    github=github)}}
+
+Another variation, a useful trick is to build wrappers/extensions.  Inline one Tiltfile testing custom behaviour, then use the inline to include an existing external file.
+
+{{macros.embed_demo(
+    'demos/tilt-inlined.mk', 
+    github=github)}}
+
+{#
+Tiltfiles and related resources sometimes struggle to stay DRY, and expect to achieve code-reuse for production workflows by gradually abstracting work into external tools-- for example when starting with yaml manifests and gradually moving to helm.
+#}
+
+### Basic Usage
+<hr style="width:100%;border-bottom:3px solid black;">
+
+Cluster lifecycle looks more or less the same as any of the other demos.
+
+```bash {.cli_example}
+# Default entrypoint runs clean, create, 
+# deploy, test, but does not tear down the cluster. 
+$ ./demos/tilt.mk clean create
+```
+
+
+```bash {.cli_example}
+# As part of `deploy`, `tilt up` will run.
+$ ./demos/tilt.mk deploy
+
+# In this case, test just retrieves logs for tilt, 
+# then drops a link for web UI so you can test.
+$ ./demos/tilt.mk test
+```
+
+```bash {.cli_example}
+# Stop the daemonizes tilt-server, tear down the cluster.
+$ ./demos/tilt.mk tilt.stop clean
+```
+
+<hr style="width:100%;border-bottom:3px solid black;">
+
+[^1]: [https://tilt.dev/](https://tilt.dev/)
+[^2]: [designed to work locally](https://docs.tilt.dev/local_vs_remote.html)*, and 1. [^3]: [It doesn't work *by itself* locally](https://docs.tilt.dev/choosing_clusters.html).  
+[^4]: [Automation/daemonization can be difficult.](https://github.com/tilt-dev/tilt/issues/4288)
+[^5]: Part of why Tiltfile's can struggle to stay DRY and related logic starts to get duplicated in different places: On the one hand, you're not supposed to use your Tiltfile to deploy to prod. To re-use Tiltfile automation from CI/CD, you'll also need to do cluster management and bring a tilt container. Sometimes you actually *need* N versions of a deployment for local/dev/prod/ci, but it's always nice to avoid that.

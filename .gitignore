@@ -31,3 +31,6 @@ broker-info.subm
 __pycache__
 broker-info.*
 .minikube
+img/*
+docs/theme/css/compose.mk.css
+.devtools

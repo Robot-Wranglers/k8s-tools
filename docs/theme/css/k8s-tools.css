@@ -1,0 +1,34 @@
+.wy-side-nav-search {
+    display: block;
+    width: 300px;
+    padding: 0.809em;
+    margin-bottom: 0.809em;
+    z-index: 200;
+    background-color: #0db7ed; 
+    text-align: center;
+    color: #fcfcfc;
+    /* background: transparent; */
+    background-position-x: 0%;
+    background-position-y: 0%;
+    background-repeat: repeat;
+    background-image: none;
+    background-size: auto;
+    background-image: url('../img/minikube.png');
+    background-repeat: no-repeat;
+    background-size: contain;
+    background-position: center;
+    background-position: 10px 0;
+    background-repeat: no-repeat;
+    /* background-size: 200px 200px; */
+    background-position: top left;
+    border: 1px solid #ccc;
+}
+.wy-side-nav-search .wy-dropdown > a img.logo, .wy-side-nav-search > a img.logo {
+    display: block;
+    margin: 0 auto;
+    height: auto;
+    width: auto;
+    border-radius: 0;
+    max-width: 100%;
+  }
+  

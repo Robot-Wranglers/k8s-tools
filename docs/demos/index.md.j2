@@ -1,0 +1,77 @@
+{% import 'macros.j2' as macros -%}
+
+## Demo Index
+<hr style="width:100%;border-bottom:3px solid black;">
+
+Demos in this reference all have the same goals:
+
+!!! goals Goals 
+    * Portable: Demos should run locally in OSX, Linux, and inside of github actions.
+    * Low/No Dependencies: no host dependencies except for `make` and `docker`.
+    * Self-documenting, Easy to extend, and within reason.. self-contained
+
+Since `k8s.mk` extends [compose.mk]({{jinja.vars.composemk_docs_url}}), you might want to reference [the upstream API]({{jinja.vars.composemk_docs_url}}/api) and [understand the basics of target-scaffolding](/k8s.mk/#overview) to completely understand demo automation but hopefully even without that background the code is pretty easy to read and adapt.
+
+### Demo Metadata
+<hr style="width:100%;border-bottom:3px solid black;">
+
+This section tracks metadata like the stack that is used, links to test-suite or API involved, etc.  
+
+See also the [toolbox manifest]({{mkdocs.site_relative_url}}/toolbox) for a list of all tools and their current version details.
+
+<table><tr><th>Demo</th><th>Stack</th><th>GH Actions</th></tr>
+  <tr><td><a href={{mkdocs.site_relative_url}}/demos/cluster-lifecycle>Basic Cluster Lifecycle</a></td>
+    <td>K3D / Kubefwd / Kubectl / Helm</td>
+    <td><a href={{github.actions_url}}/cluster-lifecycle.yml>Link &nbsp;&nbsp;&nbsp;↗️ </a></td>
+  </tr>
+  <tr><td><a href={{mkdocs.site_relative_url}}/demos/argo-wf>Argo Workflows Example</a></td>
+    <td>K3D / Argo </td>
+    <td><a href={{github.actions_url}}/cluster-lifecycle.yml>Link &nbsp;&nbsp;&nbsp;↗️ </a></td>
+  </tr>
+  <tr><td><a href={{mkdocs.site_relative_url}}/demos/argo-wf>Argo Events Example</a></td>
+    <td>K3D / Argo </td>
+    <td><a href={{github.actions_url}}/cluster-lifecycle.yml>Link &nbsp;&nbsp;&nbsp;↗️ </a></td>
+  </tr>
+  <tr><td><a href={{mkdocs.site_relative_url}}/demos/fission.md>FaaS with Fission</a></td>
+    <td>K3D / Fission / FaaS </td>
+    <td><a href={{github.actions_url}}/argo-wf.yml>Link &nbsp;&nbsp;&nbsp;↗️ </a></td>
+  </tr>
+  <tr><td><a href={{mkdocs.site_relative_url}}/demos/submariner.md>Multi-Cluster Networking</a></td>
+    <td>Minikube / Submariner / Calico </td>
+    <td><a href={{github.actions_url}}/submariner.yml>Link &nbsp;&nbsp;&nbsp;↗️ </a></td>
+  </tr>
+  <tr><td><a href={{mkdocs.site_relative_url}}/demos/kompose.md>Kompose</a></td>
+    <td>Minikube / Kompose / local-first </td>
+    <td><a href={{github.actions_url}}/kompose.yml>Link &nbsp;&nbsp;&nbsp;↗️ </a></td>
+  </tr>
+  <tr><td><a href={{mkdocs.site_relative_url}}/demos/buildah.md>Buildah</a></td>
+    <td>Minikube / Buildah</td>
+    <td><a href={{github.actions_url}}/buildah.yml>Link &nbsp;&nbsp;&nbsp;↗️ </a></td>
+  </tr>
+  <tr><td><a href={{mkdocs.site_relative_url}}/demos/kubetail.md>Kubetail</a></td>
+    <td>K3D / Kubetail / LME </td>
+    <td><a href={{github.actions_url}}/kubetail.yml>Link &nbsp;&nbsp;&nbsp;↗️ </a></td>
+  </tr>
+  <tr><td><a href={{mkdocs.site_relative_url}}/demos/istio>Istio Traffic Management</a></td>
+    <td>Minikube / Calico / Istio </td>
+    <td><a href={{github.actions_url}}/kubetail.yml>Link &nbsp;&nbsp;&nbsp;↗️ </a></td>
+  </tr>
+  <tr><td><a href={{mkdocs.site_relative_url}}/demos/istio>Tilt & Tiltfiles</a></td>
+    <td>Minikube / Tilt </td>
+    <td><a href={{github.actions_url}}/kubetail.yml>Link &nbsp;&nbsp;&nbsp;↗️ </a></td>
+  </tr>
+</table>
+
+<hr style="width:100%;border-bottom:3px solid black;">
+
+{#
+!!! road_map "Road Map"
+    Placeholder 
+
+### Others
+[^1]: [https://minikube.sigs.k8s.io](https://minikube.sigs.k8s.io/)
+[^2]: [https://docs.tigera.io](https://docs.tigera.io/)
+[^3]: [https://submariner.io](https://submariner.io)
+[^4]: [kubernetes multicluster with kind and submariner](https://piotrminkowski.com/2021/07/08/kubernetes-multicluster-with-kind-and-submariner/)
+[^5]: [minikube docker driver](https://minikube.sigs.k8s.io/docs/drivers/docker/)
+#}

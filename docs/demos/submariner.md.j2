@@ -1,0 +1,63 @@
+{% import 'macros.j2' as macros -%}
+
+## Multi-Cluster Networking with Submariner
+<hr style="width:100%;border-bottom:3px solid black;">
+{% include "includes/demo-common.md.j2" %}
+
+!!! danger "Caveat"
+    Calico setup makes it very easy to hit rate-limiting with docker.io.  Without forking charts it's not so easy to change the location that base images are pulled from.  If you're doing multiple setups/teardown in rapid succession.. this demo works best if you've already got a registry mirror setup.[^1]
+
+This demo shows an example of a project-local kubernetes cluster lifecycle with multiple clusters, and how to add networking *between* clusters.  It orchestrates usage of several items [from the toolbox]({{mkdocs.site_relative_url}}/toolbox) such as `minikube`, `kubectl`, `calicoctl` and `subctl` to add cross-cluster networking and service discovery with submariner.  See also the official docs for submariner[^2].
+
+Prototyping or faithfully mirroring cross-cluster networking *locally* is something that's usually pretty painful to do, so let's see what the k8s-tools suite can do with this sort of problem.  As usual, the goal is that there are still *no host dependencies at all* except for `make` and `docker`, and the entire thing runs well locally or [inside of github actions]({{github.actions_url}}/submariner.yml). 
+
+This demo is basically an adaptation from the official submariner docs, and this blogpost[^4] was also very helpful.  The details are adapted for working with `minikube`, but again, `minikube` itself is dockerized and won't become a host dependency.  See also the documentation for minikube docker-driver[^1] for more details.
+
+### About Choices 
+<hr style="width:100%;border-bottom:3px solid black;">
+
+There are tons of options in each niche here; for example minikube vs kind, calico vs weave or flannel, submariner vs istio.  [The toolbox]({{mkdocs.site_relative_url}}/toolbox) actually includes much of the related tooling that *wasn't* used in this demo, including `kind`, `calicoctl`, and `istioctl`.  Here's a few of the considerations involved in what *was* used:
+
+**Calico:**
+:  Complicated, but still the standard networking solution if you don't want to be locked into your cloud-provider's approach.  Even if you don't care about cloud-vendor lock-in, you're probably going to have other software or other projects that bring you back to calico anyway.  Another network stack that's supposed to deliver "close enough" local prototyping probably just won't be close enough without it.
+
+**Minikube:**
+:  The docker-driver for minikube's is *much* improved lately, very stable and fast (at least on linux).  For networking, minikube has native-ish support for calico, whereas k3d theoretically supports calico but defaults to flannel.  Part of the "fast" thing with minikube is probably just smarter caching that could be resolved somehow with `k3d` or `kind`, but zero config is hard to beat.
+
+**Submariner:**
+:  Submariner does somewhat mesh'y things with service-discovery, but it lives at the networking layer and not the application layer, and is specifically designed for handling multicluster networking.  As long as calico is already working, submariner is **miraculously simple**, and for many use-cases you may find you *don't* need something like istio.
+
+### Basic Usage
+<hr style="width:100%;border-bottom:3px solid black;">
+
+Running the demo is simple: 
+
+```bash {.cli_example}
+# Default entrypoint runs clean, create, 
+# deploy, test, but does not tear down the cluster. 
+$ ./demos/submariner.mk
+```
+{{macros.img_link("submariner.png", mkdocs, "33%",class='cli_output')}}
+
+### Interactive Workflows
+<hr style="width:100%;border-bottom:3px solid black;">
+
+```bash {.cli_example}
+# End-to-end, again without teardown
+$ ./demos/submariner.mk clean create deploy test
+```
+
+#### Source Code
+<hr style="width:100%;border-bottom:3px solid black;">
+
+{{macros.embed_demo(
+    'demos/submariner.mk', 
+    github=github)}}
+
+
+<hr style="width:100%;border-bottom:3px solid black;">
+
+[^1]: [https://minikube.sigs.k8s.io/docs/handbook/registry/](https://minikube.sigs.k8s.io/docs/handbook/registry/) [minikube registry mirror setup](https://gist.github.com/trisberg/37c97b6cc53def9a3e38be6143786589)
+[^2]: [https://submariner.io](https://submariner.io)
+[^3]: [https://docs.tigera.io](https://docs.tigera.io/)
+[^4]: [kubernetes multicluster with kind and submariner](https://piotrminkowski.com/2021/07/08/kubernetes-multicluster-with-kind-and-submariner/)

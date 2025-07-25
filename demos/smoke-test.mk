@@ -1,4 +1,4 @@
-#!/usr/bin/env -S make -f
+#!/usr/bin/env -S ./compose.mk mk.interpret!
 # demos/smoke-test.mk: 
 #
 #   A full end-to-end demo of cluster lifecycle management,
@@ -12,12 +12,11 @@
 
 include k8s.mk
 
-.DEFAULT_GOAL := all 
 export KUBECONFIG:=./local.cluster.yml
 export _:=$(shell umask 066;touch ${KUBECONFIG})
-$(eval $(call compose.import, ▰, FALSE, k8s-tools.yml))
+$(call compose.import, ▰, FALSE, k8s-tools.yml)
 
-all: clean build smoke-test 
+__main__: clean build smoke-test 
 build: #tux.require
 clean: #compose.clean/k8s-tools.yml 
 test.help:
@@ -30,12 +29,13 @@ test.help:
 test.jb:
 	echo foo=bar | make jb | jq .
 	make jb foo=bar | jq .
+
 test.stack:
-	# echo '"key=val"'./compose.mk jb |./compose.mk flux.stage.clean flux.stage.push/testing flux.stage.pop/testing | jq .foo
+	# echo '"key=val"'./compose.mk jb |./compose.mk stage.clean stage.push/testing stage.pop/testing | jq .foo
 
 test.ansible:
 	# # call the block-in-file module 
-	# echo path=.gitignore block=".flux.stage.*" | ./compose.mk jb.pipe | ./k8s.mk ansible.adhoc/blockinfile
+	# echo path=.gitignore block=".stage.*" | ./compose.mk jb.pipe | ./k8s.mk ansible.adhoc/blockinfile
 	# # failure should fail 
 	# # echo "'msg=failing as requested'" \
 	# # | ./compose.mk jb.pipe \

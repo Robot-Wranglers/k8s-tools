@@ -3,41 +3,7 @@
 ## Toolbox & Manifest
 <hr style="width:100%;border-bottom:3px solid black;">
 
-**[k8s-tools.yml](k8s-tools.yml)** is a docker compose file with 20+ container specifications covering popular platforming tools and other utilities for working with Kubernetes.  
-
-### Toolbox Manifest 
-<hr style="width:100%;border-bottom:3px solid black;">
-
-Here's a quick overview of the manifest and some details about versioning.  
-
-
-#### Upstream parts of the tool bundle
-------------------------------------
-
-These tools are packaged together as part of alpine-docker, thus basically getting one version number/tag on that container. Therefore they are not as *independently versioned* as most of the other tools, but `k8s-tools.yml` has service-stubs for quick overrides in case you need something specific.  See the [latest alpine info here](https://github.com/alpine-docker/k8s/blob/master/README.md#installed-tools).
-
-* **Core Utilities:** [kubectl](https://kubernetes.io/docs/tasks/tools/install-kubectl/), [kustomize](https://github.com/kubernetes-sigs/kustomize), [helm](https://github.com/helm/helm), [krew](https://github.com/kubernetes-sigs/krew)
-* **Misc Utilities:** [helm-diff](https://github.com/databus23/helm-diff), [helm-unittest](https://github.com/helm-unittest/helm-unittest), [helm-push](https://github.com/chartmuseum/helm-push), [kubeseal](https://github.com/bitnami-labs/sealed-secrets), [vals](https://github.com/helmfile/vals), [kubeconform](https://github.com/yannh/kubeconform), 
-* **General Utilities:** Such as bash, curl, jq, yq, etc
-
-#### Local parts of the tool bundle
-------------------------------------
-
-These tools are separate from alpine docker.  We use an official image as a base if possible, extending it where necessary.  If that's not possible, we build in-place by inlining a Dockerfile.  For details, see the [latest k8s-tools.yml here]({{github.repo_url}}/tree/master/k8s-tools.yml)
-
-* **Cluster management:** [kind](https://github.com/kubernetes-sigs/kind), [k3d](https://k3d.io/), [minikube](https://minikube.sigs.k8s.io)
-* **Workflows, FaaS, and Misc Platforming Tools:** [argocli](https://argo-workflows.readthedocs.io/en/latest/walk-through/argo-cli/), [kn](https://knative.dev/docs/client/install-kn/), [fission](https://fission.io/docs/installation/), [istioctl](https://hub.docker.com/r/istio/istioctl/), [rancher](https://github.com/rancher/cli), [subctl](https://submariner.io/)
-* **Lower-level helpers:** [helmify](https://github.com/arttor/helmify), [kompose](https://kompose.io/), [kubefwd](https://github.com/txn2/kubefwd)
-* Monitoring and metrics tools: [lazydocker](https://github.com/jesseduffield/lazydocker), [k9s](https://k9scli.io/), [kubetail](https://github.com/kubetail-org/kubetail), [promtool](https://prometheus.io/docs/prometheus/latest/command-line/promtool/)
-* **Krew plugins:** [sick-pods](https://github.com/alecjacobs5401/kubectl-sick-pods), [ktop](https://github.com/vladimirvivien/ktop), [kubectx, and kubens](https://github.com/ahmetb/kubectx) available by default, and more on demand.
-* **Cloud Utilities:** [eksctl](https://github.com/weaveworks/eksctl), [cdk](https://docs.aws.amazon.com/cdk), [awscli v1](https://github.com/aws/aws-cli), [aws-iam-authenticator](https://github.com/kubernetes-sigs/aws-iam-authenticator)
-* **TUI and user-messaging utilities:** [gum](https://github.com/charmbracelet/gum), [pv](https://www.ivarch.com/programs/pv.shtml), [spark](https://raw.githubusercontent.com/holman/spark/), [tte](https://github.com/ChrisBuilds/terminaltexteffects)
-* **General Utilities:** Fixed (i.e. non-busybox) versions of things like date, ps, uuidgen, etc
-
-### Curated Tool Containers
-<hr style="width:100%;border-bottom:3px solid black;">
-
-The collection is structured in the following ways:
+**[k8s-tools.yml](k8s-tools.yml)** is a docker compose file with 20+ container specifications covering popular platforming tools and other utilities for working with Kubernetes.  The collection is structured in the following ways:
 
 1. **Executable file,** i.e. `./k8s-tools.yml ...`  is equivalent to `docker compose -f k8s-tools.yml ...`
 1. **Tool containers are easy to change or extend, in place.**  We use the [dockerfile_inline directive](https://docs.docker.com/compose/compose-file/build/#dockerfile_inline) to avoid extra clutter.  Customize them if you need to, and you can still avoid having N Dockerfiles cluttering up your whole repository.
@@ -46,3 +12,39 @@ The collection is structured in the following ways:
 1. **All tool containers are just-in-time & on-demand,** so that having these declared in case of eventual use won't saddle you with an enormous bootstrap process.  As usual with docker-compose, containers aren't pulled until they are used, and build-when-changed mostly works as you'd expect.  
 
 The overall focus for `k8s-tools.yml` is to stand alone with no host dependencies (not even Dockerfiles), yet provide boilerplate that's parametric enough to work pretty well across different projects without changing the compose file.  Technically you don't need [project integration]({{mkdocs.site_relative_url}}/quickstart) or even need `k8s.mk`, but [you'll probably want it anyway]({{mkdocs.site_relative_url}}/k8s.mk#tool-container-basics).
+
+### Toolbox Manifest 
+<hr style="width:100%;border-bottom:3px solid black;">
+
+Here's a quick overview of the manifest and some details about versioning.  
+
+#### Upstream parts of the tool bundle
+<hr style="width:95%;border-bottom:1px dashed black;">
+
+These tools are packaged together as part of alpine-docker, thus basically getting one version number/tag on that container. Therefore they are not as *independently versioned* as most of the other tools, but `k8s-tools.yml` has service-stubs for quick overrides in case you need something specific.  See the [latest alpine info here](https://github.com/alpine-docker/k8s/blob/master/README.md#installed-tools).
+
+* **Core Utilities:** [kubectl](https://kubernetes.io/docs/tasks/tools/install-kubectl/), [kustomize](https://github.com/kubernetes-sigs/kustomize), [helm](https://github.com/helm/helm), [krew](https://github.com/kubernetes-sigs/krew)
+* **Misc Utilities:** [helm-diff](https://github.com/databus23/helm-diff), [helm-unittest](https://github.com/helm-unittest/helm-unittest), [helm-push](https://github.com/chartmuseum/helm-push), [kubeseal](https://github.com/bitnami-labs/sealed-secrets), [vals](https://github.com/helmfile/vals), [kubeconform](https://github.com/yannh/kubeconform), 
+* **General Utilities:** Such as bash, curl, jq, yq, etc
+
+#### Local parts of the tool bundle
+<hr style="width:95%;border-bottom:1px dashed black;">
+
+These tools are separate from alpine docker.  An official image base is used when possible, extending it where necessary.  If that's not possible, we build in-place by inlining a Dockerfile.  For details, see the [latest k8s-tools.yml here]({{github.repo_url}}/tree/master/k8s-tools.yml)
+
+* **Cluster management:** [kind](https://github.com/kubernetes-sigs/kind), [k3d](https://k3d.io/), [minikube](https://minikube.sigs.k8s.io), [kubeadm](https://kubernetes.io/docs/reference/setup-tools/kubeadm/)
+* **Cloud Utilities:** [eksctl](https://github.com/weaveworks/eksctl), [aws cdk](https://docs.aws.amazon.com/cdk), [awscli v1](https://github.com/aws/aws-cli), [aws-iam-authenticator](https://github.com/kubernetes-sigs/aws-iam-authenticator), [gcloud sdk](https://hub.docker.com/r/google/cloud-sdk)* 
+* **Workflows & Platforming Tools:** [argocli](https://argo-workflows.readthedocs.io/en/latest/walk-through/argo-cli/), [calicoctl](https://docs.tigera.io/calico/latest/operations/calicoctl/install), [kn](https://knative.dev/docs/client/install-kn/), [fission](https://fission.io/docs/installation/), [istioctl](https://hub.docker.com/r/istio/istioctl/), [rancher](https://github.com/rancher/cli), [skupper](https://skupper.io/), [subctl](https://submariner.io/), [tilt](https://tilt.dev)
+* **Lower-level Helpers:** [helmify](https://github.com/arttor/helmify), [kompose](https://kompose.io/), [kubefwd](https://github.com/txn2/kubefwd)
+* **Monitoring & Metrics Tools:** [lazydocker](https://github.com/jesseduffield/lazydocker), [k9s](https://k9scli.io/), [kubetail](https://github.com/kubetail-org/kubetail), [promtool](https://prometheus.io/docs/prometheus/latest/command-line/promtool/)
+* **Krew plugins:** [sick-pods](https://github.com/alecjacobs5401/kubectl-sick-pods), [ktop](https://github.com/vladimirvivien/ktop), [kubectx, and kubens](https://github.com/ahmetb/kubectx) available by default
+
+* **TUI & User-messaging Utilities:** [gum](https://github.com/charmbracelet/gum), [pv](https://www.ivarch.com/programs/pv.shtml), [sparklines](https://github.com/holman/spark/), [tte](https://github.com/ChrisBuilds/terminaltexteffects), and others via [compose.mk]({{jinja.vars.composemk_docs_url}}/tool-overview/#tool-wrappers)
+* **General Utilities:** Fixed (i.e. non-busybox) versions of things like `date`, `ps`, `uuidgen`, etc
+
+### Versions and Overrides
+<hr style="width:100%;border-bottom:3px solid black;">
+
+*Parsed from the latest source @ {{macros.repo_link('k8s-tools.yml', github=github)}}*
+
+{{bash("./k8s.mk k8s-tools.versions.table")}}

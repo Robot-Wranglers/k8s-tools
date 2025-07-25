@@ -1,5 +1,5 @@
 # See also: https://docs.github.com/en/actions
-name: FaaS Demo
+name: Functions as a Service
 on:
   workflow_dispatch: {}
   workflow_call: {}
@@ -13,7 +13,7 @@ permissions:
   contents: read
 jobs:
   test:
-    name: FaaS Demo
+    name: Functions as a Service Demo
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3

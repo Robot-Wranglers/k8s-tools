@@ -1,0 +1,78 @@
+{% import 'macros.j2' as macros -%}
+
+## Intro to Clusters
+<hr style="width:100%;border-bottom:3px solid black;">
+
+{% set demo_extra="See also the [Local Cluster](" + mkdocs.site_relative_url + "/quickstart/#local-clusters) section of the quickstart docs"%}
+{% include "includes/demo-common.md.j2" %}
+
+Obviously to demonstrate anything else with kubernetes, we're going to need a cluster!  Clusters might be local or remote, but project-local clusters are part of the core capabilities for `k8s.mk`.
+
+Actually *using* a cluster with `k8s.mk` just requires that KUBECONFIG is set in the environment as usual, whether you're in a scripting context or in tool mode.
+
+**For creating a project-local cluster,** you can choose amongst what's supported by [the toolbox]({{mkdocs.site_relative_url}}/toolbox), including some support for *minikube*, *k3d*, and *kind*.  
+
+**For lifecycle management of remote clusters,** `k8s.mk` can pretty much support whatever tooling you want to use, probably via the [technique described here](#manual-cluster-management), and does ship with tool containers like `eksctl` and `gcloud`.  You could also out-source the cluster management [via ansible]({{mkdocs.site_relative_url}}/ansible), [or terraform]({{mkdocs.site_relative_url}}/demos/terraform), etc, and still use `k8s.mk` at an orchestration layer.
+
+### Manual Cluster Management
+<hr style="width:100%;border-bottom:3px solid black;">
+
+There are few ways to handle cluster lifecycle automation, ranging from pretty explicit to more magical, depending on your appetite for abstraction.
+
+The most direct way to manage clusters is by [using dispatch]({{mkdocs.site_relative_url}}/k8s.mk#dispatch) to run scripts inside the relevant tool containers.  For example, with the kind container:
+
+{#
+### Usage
+<hr style="width:100%;border-bottom:3px solid black;">
+### Source Code 
+<hr style="width:100%;border-bottom:3px solid black;">
+---------------------#}
+
+{{macros.embed_demo(
+    'demos/kind.mk', 
+    github=github)}}
+
+Writing script for usage *inside* the cluster-management tool container is mostly a backup plan in case `k8s.mk` has no API that covers the use-case.  In the case of `kind`, there is an API actually (see the next section), but this pattern comes up if you need more customized control, or want to drive the other tool-containers (like `eksctl`, or `gcloud`).
+
+
+### Cluster CRUD with API 
+<hr style="width:100%;border-bottom:3px solid black;">
+
+For each of [*minikube*]({{mkdocs.site_relative_url}}/api#api-minikube), [*k3d*]({{mkdocs.site_relative_url}}/api#api-k3d), and [*kind*]({{mkdocs.site_relative_url}}/api#api-kind), a basic create/read/update/delete api is available.  
+
+Amongst other thing this exposes targets like *`<cluster_type>.get_or_create/<cluster_name>`* for idempotent operations, and a tiny amount of boilerplate sets up everything:
+
+{{macros.embed_demo(
+    'demos/kind-2.mk', 
+    github=github)}}
+
+Besides using `kind.*` above, note also the usage of `stage/..` declarations, which adds a banner to automation output, and enables some support for artifact storage (like cluster connection details).[^2]
+
+{{macros.api_link_many('k3d minikube kind'.split(),mkdocs)}}
+
+### Scaffolded Clusters
+<hr style="width:100%;border-bottom:3px solid black;">
+
+In cases where the underlying cluster API meets the *cluster-interface*, you can skip defining individual targets as seen in the last section, and scaffold clusters directly from metadata.
+
+{{macros.embed_demo(
+    'demos/kind-3.mk', 
+    github=github)}}
+
+
+For each of [*minikube*]({{mkdocs.site_relative_url}}/api#api-minikube), [*k3d*]({{mkdocs.site_relative_url}}/api#api-k3d), and [*kind*]({{mkdocs.site_relative_url}}/api#api-kind), a basic create/read/update/delete api is available.  
+
+Amongst other thing this exposes targets like *`<cluster_type>.get_or_create/<cluster_name>`* for idempotent operations, and a tiny amount of boilerplate sets up everything:
+
+{{macros.embed_demo(
+    'demos/kind.mk', 
+    github=github)}}
+
+Besides using `kind.*` above, note also the usage of `stage/..` declarations, which adds a banner to automation output, and enables some support for artifact storage (like cluster connection details).[^2]
+
+
+
+<hr style="width:100%;border-bottom:3px solid black;">
+
+[^1]: [kube-prometheus-stack](https://artifacthub.io/packages/helm/prometheus-community/kube-prometheus-stack)
+[^2]: See the [upstream docs for Stacks and Stages]({{jinja.vars.composemk_docs_url}}/stages).

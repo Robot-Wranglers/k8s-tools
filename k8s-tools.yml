@@ -63,11 +63,9 @@ services:
         RUN cp /home/${DOCKER_UGNAME:-root}/.krew/bin/* /usr/bin
         RUN chown -R ${DOCKER_UID:-1000}:${DOCKER_GID:-1000} /home/${DOCKER_UGNAME:-root}/
         RUN curl -sL https://raw.githubusercontent.com/holman/spark/master/spark -o /usr/bin/spark && chmod ugo+x /usr/bin/spark
-        RUN apk -q --no-cache add docker docker-compose
-        # required by minikube
-        RUN apk -q --no-cache add libc6-compat
-        RUN curl -LO https://github.com/kubernetes/minikube/releases/latest/download/minikube-linux-amd64
-        RUN install minikube-linux-amd64 /usr/local/bin/minikube && rm minikube-linux-amd64
+        RUN apk -q --no-cache add docker docker-compose kubeadm
+        RUN curl -fsLo /usr/local/bin/kubetail https://github.com/kubetail-org/kubetail/releases/download/cli%2F${KUBETAIL_VERSION:-v0.7.0}/kubetail-linux-amd64
+        RUN chmod o+x /usr/local/bin/kubetail
         USER ${DOCKER_UGNAME:-root}
         ENV PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/home/${DOCKER_UGNAME:-root}/.krew/bin
     # NB: Left for reference, and possibly required by older versions of docker or certain configurations?  
@@ -77,7 +75,8 @@ services:
     volumes:
       # Share the docker sock.  Almost everything will need this
       - ${DOCKER_SOCKET:-/var/run/docker.sock}:/var/run/docker.sock
-      
+      # Share Docker's storage
+      - /var/lib/docker:/var/lib/docker  
       # Share /etc/hosts, so tool containers have access to any custom or kubefwd'd DNS
       - /etc/hosts:/etc/hosts:ro
       
@@ -110,93 +109,111 @@ services:
       # - ${HOME}/.aws:/home/${DOCKER_UGNAME:-root}/.aws
     tty: true 
 
-  kubetail:
+  kubetail_server:
     <<: *base
-    # hostname: k8s:kubetail 
-    # entrypoint: kubetail 
-    # build: 
-    #   context: . 
-    #   tags: ['k8s:kubetail']
-    #   dockerfile_inline: |
-    #     FROM k8s:base
-    #     RUN curl -sS https://www.kubetail.com/install.sh | bash -x
+    hostname: k8s:kubetail
+    depends_on: ['k8s']
+    command: >- 
+      sh -x -c "kubetail serve --skip-open \
+      --kubeconfig /home/${DOCKER_UGNAME:-root}/.kube/config \
+      --port ${KUBETAIL_PORT:-9999}"
+    build: 
+      context: . 
+      tags: ['k8s:kubetail']
+      dockerfile_inline: |
+        FROM k8s:base
 
   minikube:
     <<: *base
-    # hostname: k8s:kubetail 
-    # entrypoint: kubetail 
-    # build: 
-    #   context: . 
-    #   tags: ['k8s:kubetail']
-    #   dockerfile_inline: |
-    # required by minikube
-    # RUN apk -q --no-cache add libc6-compat
-    # RUN curl -LO https://github.com/kubernetes/minikube/releases/latest/download/minikube-linux-amd64
-    # RUN install minikube-linux-amd64 /usr/local/bin/minikube && rm minikube-linux-amd64
-
-  registry-mirror:
-    image: registry:2
-    environment:
-      REGISTRY_PROXY_REMOTEURL: http://host.docker.internal:5000
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
+    hostname: k8s:minikube 
+    entrypoint: minikube 
+    depends_on: ['k8s']
+    build: 
+      context: . 
+      tags: ['k8s:minikube']
+      dockerfile_inline: |
+        FROM k8s:base AS base
+        USER root
+        RUN apk -q --no-cache add libc6-compat
+        RUN curl -fsLo /usr/local/bin/minikube https://github.com/kubernetes/minikube/releases/download/${MINIKUBE_VERSION:-v1.36.0}/minikube-linux-amd64
+        RUN chmod o+x /usr/local/bin/minikube
+        USER ${DOCKER_UGNAME:-root}
+    # volumes:
+    #   - ${DOCKER_SOCKET:-/var/run/docker.sock}:/var/run/docker.sock
+    #   # Share Docker's storage
+    #   - /var/lib/docker:/var/lib/docker  
+    #   # Share /etc/hosts, so tool containers have access to any custom or kubefwd'd DNS
+    #   - /etc/hosts:/etc/hosts:ro
+    #   # Share the working directory with containers.  
+    #   # Overrides are allowed for the workspace, which is occasionally useful with DIND
+    #   - ${workspace:-${PWD}}:/workspace
+    #   - "${KUBECONFIG:-~/.kube/config}:/home/${DOCKER_UGNAME:-root}/.kube/config"
+      
+  skupper:
+    <<: *base
+    hostname: k8s:skupper 
+    entrypoint: skupper 
+    depends_on: ['k8s']
+    build: 
+      context: . 
+      tags: ['k8s:skupper']
+      dockerfile_inline: |
+        FROM k8s:base AS base
+        USER root
+        RUN apk -q --no-cache add libc6-compat
+        RUN curl -fsL https://skupper.io/v2/install.sh \
+          | sh /dev/stdin --version ${SKUPPER_VERSION:-2.0.0}
+        RUN mv ~/.local/bin/skupper /usr/local/bin
+        USER ${DOCKER_UGNAME:-root}
+  
+  # registry-mirror:
+  #   image: registry:2
+  #   environment:
+  #     REGISTRY_PROXY_REMOTEURL: http://host.docker.internal:5000
+  #   extra_hosts:
+  #     - "host.docker.internal:host-gateway"
 
   # https://helm.sh/docs/
+  # Already available in the k8s base (from alpine-k8s).
+  # This service is just a stub to accomodate overrides, and
+  # avoid confusion, but the base can always be used instead.
   helm:
     <<: *base
     entrypoint: helm
     hostname: k8s:helm
   
   # https://kubernetes.io/docs/reference/kubectl/
+  # Already available in the k8s base (from alpine-k8s).
+  # This service is just a stub to accomodate overrides, and
+  # avoid confusion, but the base can always be used instead.
   kubectl:
     <<: *base
     entrypoint: kubectl
     hostname: k8s:kubectl
 
-  # https://github.com/kubernetes-sigs/kustomize
-  # kustomize:
-  #   <<: *base
-  #   entrypoint: kustomize
-  #   hostname: k8s:kustomize
-
-  # https://github.com/databus23/helm-diff
-  # helm-diff:
-  #   <<: *base
-  #   entrypoint: helm-diff
-  #   hostname: k8s:helm-diff
-
-  # https://github.com/helm-unittest/helm-unittest
-  # helm-unittest:
-  #   <<: *base
-  #   entrypoint: helm-unittest
-  #   hostname: k8s:helm-unittest
-
-  # https://github.com/chartmuseum/helm-push
-  # helm-push:
-  #   <<: *base
-  #   entrypoint: helm-push
-  #   hostname: k8s:helm-push
-
-  # https://github.com/kubernetes-sigs/aws-iam-authenticator
-  # aws-iam-authenticator:
-  #   <<: *base
-  #   entrypoint: aws-iam-authenticator
-  #   hostname: k8s:aws-iam-authenticator
-  #   tty: true
-
-  # https://github.com/weaveworks/eksctl
-  # eksctl:
-  #   <<: *base
-  #   entrypoint: eksctl
-  #   hostname: k8s:eksctl
-
   # https://github.com/aws/aws-cli
-  # awscli: # v1
-  #   <<: *base
-  #   entrypoint: awscli
-  #   hostname: k8s:awscli
-
+  awscli: # v1
+    <<: *base
+    entrypoint: awscli
+    hostname: k8s:awscli
+    build: 
+      context: . 
+      tags: ['k8s:awscli']
+      dockerfile_inline: |
+        # FROM amazon/aws-cli:2.27.34 as aws
+        FROM k8s:base AS base
+        # USER root
+        # COPY --from=aws /usr/local/aws-cli/ /usr/local/aws-cli/
+        # COPY --from=aws /usr/local/bin/aws /usr/local/bin/aws
+        # # Install additional packages
+        # RUN apk add --no-cache curl jq bash python3
+        # RUN apk add -q --no-cache libc6-compat musl-dev
+        # ENV PATH="/usr/local/aws-cli/v2/current/bin:$PATH"
+        # USER ${DOCKER_UGNAME:-root}
+    # docker pull amazon/aws-cli:2.27.34
   # https://docs.aws.amazon.com/cdk
+  # /usr/local/bin/aws
+  
   # FIXME: needs a python stack for many use-cases
   cdk:
     <<: *base
@@ -310,7 +327,7 @@ services:
       dockerfile_inline: |
         FROM k8s:base
         USER root 
-        RUN curl -Lo /usr/bin/kompose https://github.com/kubernetes/kompose/releases/download/${KOMPOSE_CLI_VERSION:-v1.33.0}/kompose-linux-amd64
+        RUN curl -Lo /usr/bin/kompose https://github.com/kubernetes/kompose/releases/download/${KOMPOSE_CLI_VERSION:-v1.36.0}/kompose-linux-amd64
         RUN chmod +x /usr/bin/kompose
         USER ${DOCKER_UGNAME:-root}
     entrypoint: kompose
@@ -368,7 +385,6 @@ services:
       # Same as the base volumes, plus /etc/hosts for kubefwd to sync DNS
       - /etc/hosts:/etc/hosts:rw
       - ${workspace:-${PWD}}:/workspace
-      - ${DOCKER_SOCKET:-/var/run/docker.sock}:${DOCKER_SOCKET:-/var/run/docker.sock}
       - ${HOME}/.cache:/root/.cache
       - "${KUBECONFIG:-~/.kube/config}:/root/.kube/config"
       - ${DOCKER_SOCKET:-/var/run/docker.sock}:/var/run/docker.sock
@@ -403,7 +419,7 @@ services:
       dockerfile_inline: |
         FROM k8s:base
         USER root
-        RUN wget https://github.com/jesseduffield/lazydocker/releases/download/v${LAZY_DOCKER_CLI_VERSION:-0.23.1}/lazydocker_${LAZY_DOCKER_CLI_VERSION:-0.23.1}_Linux_x86_64.tar.gz 
+        RUN wget https://github.com/jesseduffield/lazydocker/releases/download/v${LAZY_DOCKER_VERSION:-0.23.1}/lazydocker_${LAZY_DOCKER_VERSION:-0.23.1}_Linux_x86_64.tar.gz 
         RUN tar -zxvf lazydocker*
         RUN mv lazydocker /usr/bin && rm lazydocker*
         USER ${DOCKER_UGNAME:-root}
@@ -493,6 +509,17 @@ services:
         USER ${DOCKER_UGNAME:-root}
     entrypoint: bash
   
+  # https://hub.docker.com/r/google/cloud-sdk
+  gcloud:
+    <<: *base
+    depends_on: ['k8s']
+    hostname: "k8s:gcloud"
+    build:
+      tags: ['k8s:gcloud']
+      context: .
+      dockerfile_inline: |
+        FROM google/cloud-sdk:${GCLOUD_SDK_VERSION:-526.0.1}
+  
   # https://docs.ansible.com/ansible/latest/collections/kubernetes/core/k8s_module.html
   ansible:
     <<: *base
@@ -506,20 +533,13 @@ services:
       context: .
       tags: ['k8s:ansible']
       dockerfile_inline: |
-        # FROM ${ANSIBLE_BASE:-${PYTHON_BASE:-python:3.11-slim-bookworm}}
         FROM k8s:dind
-        # COPY --from=builder /opt/bitnami/kubectl/bin/kubectl /usr/bin
-        #   /bin/bash /usr/bin/make \
-        #     /usr/bin/kube* /usr/bin/helm* \
-        #       /usr/bin/gum /usr/bin
         USER root
         RUN apt-get update -qq && apt-get install -qq -y python3 python3-pip
         RUN pip3 install --break-system-packages ansible==${ANSIBLE_VERSION:-10.1.0}
         RUN ansible-galaxy collection install kubernetes.core
         RUN pip install kubernetes --break-system-packages
         RUN pip freeze|grep kuber
-        # RUN curl -LO https://dl.k8s.io/release/${KUBECTL_CLI_VERSION:-v1.30.0}/bin/linux/amd64/kubectl && mv kubectl /usr/bin
-        # RUN wget https://get.helm.sh/helm-${HELM_CLI_VERSION:-v3.14.4}-linux-amd64.tar.gz && tar -zxvf helm* && mv */helm /usr/bin
         USER ${DOCKER_UGNAME:-root}
   
   # https://submariner.io/operations/deployment/subctl/
@@ -538,8 +558,43 @@ services:
         USER ${DOCKER_UGNAME:-root}
     entrypoint: /usr/local/bin/subctl
   
+  # https://tilt.dev/
+  tilt:
+    <<: *base
+    depends_on: ['k8s']
+    hostname: "k8s:tilt"
+    build:
+      tags: ['k8s:tilt']
+      context: .
+      dockerfile_inline: |
+        # FROM docker/tilt:v${TILT_VERSION:-0.34.5} AS tilt
+        #COPY --from=tilt /usr/local/bin/tilt /usr/local/bin/tilt
+        FROM k8s:base 
+        USER root 
+        RUN apk add -q --no-cache libc6-compat shadow
+        RUN curl -fsSL \
+          https://github.com/tilt-dev/tilt/releases/download/v${TILT_VERSION:-0.34.5}/tilt.${TILT_VERSION:-0.34.5}.linux.x86_64.tar.gz \
+          | tar -xzv tilt && mv tilt /usr/local/bin/tilt
+        USER ${DOCKER_UGNAME:-root}
+    command: >-
+      sh -x -c "export TILT_DISABLE_ANALYTICS=true; tilt down -f ${TILT_FILE:-Tiltfile}; tilt up -f ${TILT_FILE:-Tiltfile} --port ${TILT_PORT:-10350} --host ${TILT_HOST:-0.0.0.0} --stream"
   
-  # https://robot-wranglers.github.io/k8s-tools/#embedded-tui
+  # https://registry.terraform.io/providers/hashicorp/kubernetes/latest/docs
+  terraform:
+    <<: *base
+    depends_on: ['k8s']
+    hostname: "k8s:terraform"
+    build:
+      tags: ['k8s:terraform']
+      context: .
+      dockerfile_inline: |
+        FROM hashicorp/terraform:${TERAFORM_VERSION:-1.12.2} as tf_base
+        FROM k8s:base 
+        USER root 
+        COPY --from=tf_base /bin/terraform /usr/local/bin/terraform
+        USER ${DOCKER_UGNAME:-root}
+  
+  # https://robot-wranglers.github.io/compose.mk/#embedded-tui
   tui: 
     <<: *base
     hostname: k8s:tui
@@ -563,4 +618,104 @@ services:
         RUN apt-get update -qq && apt-get install -qq -y graphviz imagemagick
         USER ${DOCKER_UGNAME:-root}
 
-# https://github.com/kdash-rs/kdash?tab=readme-ov-file
+  # NB: All of the following are already available in the k8s base,
+  # i.e. from alpine-k8s. The services below are just stubs to accomodate 
+  # overrides.  
+  #░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+
+  # https://github.com/kubernetes-sigs/kustomize
+  # kustomize:
+  #   <<: *base
+  #   entrypoint: kustomize
+  #   hostname: k8s:kustomize
+
+  # https://github.com/databus23/helm-diff
+  # Already available in the k8s base (from alpine-k8s).
+  # This service is just a stub to accomodate overrides.
+  # helm-diff:
+  #   <<: *base
+  #   entrypoint: helm-diff
+  #   hostname: k8s:helm-diff
+
+  # https://github.com/helm-unittest/helm-unittest
+  # Already available in the k8s base (from alpine-k8s).
+  # This service is just a stub to accomodate overrides.
+  # helm-unittest:
+  #   <<: *base
+  #   entrypoint: helm-unittest
+  #   hostname: k8s:helm-unittest
+
+  # https://github.com/chartmuseum/helm-push
+  # Already available in the k8s base (from alpine-k8s).
+  # This service is just a stub to accomodate overrides.
+  # helm-push:
+  #   <<: *base
+  #   entrypoint: helm-push
+  #   hostname: k8s:helm-push
+
+  # https://github.com/kubernetes-sigs/aws-iam-authenticator
+  # Already available in the k8s base (from alpine-k8s).
+  # This service is just a stub to accomodate overrides.
+  # aws-iam-authenticator:
+  #   <<: *base
+  #   entrypoint: aws-iam-authenticator
+  #   hostname: k8s:aws-iam-authenticator
+  #   tty: true
+
+  # https://github.com/weaveworks/eksctl
+  # eksctl:
+  #   <<: *base
+  #   entrypoint: eksctl
+  #   hostname: k8s:eksctl
+  
+  ## Experimental 
+  #░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+  # metaflow:
+  #   <<: *base
+  #   depends_on: ['k8s']
+  #   hostname: "k8s:metaflow"
+  #   build:
+  #     tags: ['k8s:metaflow']
+  #     context: .
+  #     dockerfile_inline: |
+  #       FROM k8s:base 
+  #       USER root 
+  #       RUN apk add -q --update --no-cache \
+  #         python3 py3-pip curl sudo
+  #       RUN pip install \
+  #         metaflow==2.15.15 kubernetes==32.0.1 pylint==3.3.7 \
+  #         --break-system-packages
+  #       RUN apk add -q --update --no-cache \
+  #         bash 
+  #       USER ${DOCKER_UGNAME:-root}
+  
+  # buildah:
+  #   <<: *base
+  #   depends_on: ['k8s']
+  #   hostname: "k8s:buildah"
+  #   build:
+  #     tags: ['k8s:buildah']
+  #     context: .
+  #     dockerfile_inline: |
+  #       # FROM quay.io/buildah/stable:v1.40.0 as base 
+  #       FROM k8s:base
+  #       USER root
+  #       RUN apk add --no-cache \
+  #           bash git go build-base \
+  #           gcompat btrfs-progs-dev gpgme-dev \
+  #           fuse-overlayfs \
+  #           libseccomp-dev
+  #       # Clone and build Buildah
+  #       RUN mkdir -p /opt 
+  #       RUN git clone --depth 1 \
+  #         --branch ${BUILDAH_VERSION:-v1.36.0} \
+  #           https://github.com/containers/buildah.git /opt/buildah
+  #       RUN cd /opt/buildah && make && make install 
+  #       RUN apk add --no-cache netavark podman 
+  #   privileged: true
+  #   environment:
+  #     - BUILDAH_RUNTIME=runc
+  #     - BUILDAH_ISOLATION=oci
+  #     - STORAGE_DRIVER=overlay2
+  #     - STORAGE_OPTS=overlay2.override_kernel_check=1
+  #   entrypoint: /usr/local/bin/buildah

@@ -20,7 +20,7 @@ jobs:
       - name: Initialize
         run: make clean 
         #init build
-      - name: Run Istio
+      - name: Run Traffic Management Demo
         run: ./demos/istio.mk
         env:
           COLUMNS: 90
