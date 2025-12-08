@@ -1,4 +1,4 @@
-{% import 'macros.j2' as macros -%}
+{% import 'macros/base.j2' as macros -%}{% import 'macros/site.j2' as site -%}
 
 ## Cluster Lifecycle Demo
 <hr style="width:100%;border-bottom:3px solid black;">
@@ -45,7 +45,7 @@ $ ./demos/cluster-lifecycle.mk teardown
 
 Grafana and Prometheus were already installed via the `deploy.grafana` target, which runs as a prerequisite for the main `deploy` target.  This setup also includes prometheus, and uses the standard charts[^1].  But so far we haven't exercised or interacted with the installation.  Let's take a look at the common interactive cluster workflows.  
 
-It's a good idea to start with usage of `cluster.wait`, which is just an alias for the {{macros.api_link('k8s.wait', mkdocs)}} target, and ensures that all pods are ready.  This isn't *strictly* necessary since the automation does it already, but it's a good reminder that the [whole internal API for k8s.mk]({{mkdocs.site_relative_url}}/api) is automatically available as a CLI.
+It's a good idea to start with usage of `cluster.wait`, which is just an alias for the {{site.api_link('k8s.wait', mkdocs)}} target, and ensures that all pods are ready.  This isn't *strictly* necessary since the automation does it already, but it's a good reminder that the [whole internal API for k8s.mk]({{mkdocs.site_relative_url}}/api) is automatically available as a CLI.
 
 ```bash {.cli_example}
 $ ./demos/cluster-lifecycle.mk cluster.wait
@@ -154,7 +154,7 @@ The `cluster.shell` target is already "project local".  Like much of the other a
 cluster.shell: cluster.wait k8s.pod.shell/${pod.namespace}/${pod.name}
 ```
 
-So under the hood `cluster.shell` uses {{macros.api_link('k8s.wait', mkdocs)}} to block in case the cluster is still bootstrapping.  Afterwards it uses {{macros.api_link('k8s.pod.shell', mkdocs,arg='namespace/pod')}}, passing in the same values we used to start the test-pod.  
+So under the hood `cluster.shell` uses {{site.api_link('k8s.wait', mkdocs)}} to block in case the cluster is still bootstrapping.  Afterwards it uses {{site.api_link('k8s.pod.shell', mkdocs,arg='namespace/pod')}}, passing in the same values we used to start the test-pod.  
 
 -----------------------------------------
 
@@ -241,7 +241,7 @@ At the same time, we accomplished some very useful decoupling.  This automation 
 ### Source Code 
 <hr style="width:100%;border-bottom:3px solid black;">
 
-{{macros.embed_demo(
+{{site.embed_demo(
     'demos/cluster-lifecycle.mk', 
     github=github)}}
 

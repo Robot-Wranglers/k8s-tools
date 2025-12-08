@@ -1,4 +1,4 @@
-{% import 'macros.j2' as macros -%}
+{% import 'macros/base.j2' as macros -%}{% import 'macros/site.j2' as site -%}
 
 ## Library Overview 
 <hr style="width:100%;border-bottom:3px solid black;">
@@ -46,9 +46,9 @@ Here's an overview for how the `k8s.mk` library is organized into modules: you c
 #### API: compose
 <hr style="width:100%;border-bottom:3px solid black;">
 
-{{macros.parse_module_help('compose.mk', 'compose')}}
+{{site.parse_module_help('compose.mk', 'compose')}}
 
-{{macros.parse_help('compose.mk', 'compose', github)}}
+{{site.parse_help('compose.mk', 'compose', github)}}
 
 [**`helm.*` targets:**]({{mkdocs.site_relative_url}}/api#api-helm) 
 :  Placeholder

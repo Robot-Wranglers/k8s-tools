@@ -1,4 +1,4 @@
-{% import 'macros.j2' as macros -%}
+{% import 'macros/base.j2' as macros -%}{% import 'macros/site.j2' as site -%}
 
 ## Working with Ansible
 <hr style="width:100%;border-bottom:3px solid black;">
@@ -50,7 +50,7 @@ $ ./k8s.mk jb name=ahoy \
 
 Another option is to describe partial playbooks, i.e. inlined task-lists without the hassle of inventories or the rest of the playbook config context.
 
-{{macros.embed_demo(
+{{site.embed_demo(
     'demos/ansible.mk', 
     github=github)}}
 

@@ -1,4 +1,4 @@
-{% import 'macros.j2' as macros -%}
+{% import 'macros/base.j2' as macros -%}{% import 'macros/site.j2' as site -%}
 
 ## Tilting
 <hr style="width:100%;border-bottom:3px solid black;">
@@ -31,13 +31,13 @@ Bonus: Besides running tilt from `k8s.mk`, you can also run `k8s.mk` from Tiltfi
 
 Just a few lines to handle cluster details and lifecycle automation aliases, and a few to start and daemonize the tilt server while looking at an external Tiltfile:
 
-{{macros.embed_demo(
+{{site.embed_demo(
     'demos/tilt.mk', 
     github=github)}}
 
 Another variation, a useful trick is to build wrappers/extensions.  Inline one Tiltfile testing custom behaviour, then use the inline to include an existing external file.
 
-{{macros.embed_demo(
+{{site.embed_demo(
     'demos/tilt-inlined.mk', 
     github=github)}}
 

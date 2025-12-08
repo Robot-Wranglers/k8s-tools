@@ -1,4 +1,4 @@
-{% import 'macros.j2' as macros -%}
+{% import 'macros/base.j2' as macros -%}{% import 'macros/site.j2' as site -%}
 
 ## Object Storage with Minio
 <hr style="width:100%;border-bottom:3px solid black;">
@@ -14,7 +14,7 @@ This demo is just a quick start for minio itself, but is a good starting place f
 ### Source Code
 <hr style="width:100%;border-bottom:3px solid black;">
 
-{{macros.embed_demo(
+{{site.embed_demo(
     'demos/minio.mk', 
     github=github)}}
 

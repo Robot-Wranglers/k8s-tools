@@ -1,4 +1,4 @@
-{% import 'macros.j2' as macros -%}
+{% import 'macros/base.j2' as macros -%}{% import 'macros/site.j2' as site -%}
 
 ## Working with Terraform
 <hr style="width:100%;border-bottom:3px solid black;">
@@ -20,11 +20,11 @@ For power users, there are a few other use-cases that might be more interesting.
 ### Source Code
 <hr style="width:100%;border-bottom:3px solid black;">
 
-{{macros.embed_demo(
+{{site.embed_demo(
     'demos/terraform.mk', 
     github=github)}}
 
-{{macros.embed_demo(
+{{site.embed_demo(
     'demos/terraform-2.mk', 
     github=github)}}
 

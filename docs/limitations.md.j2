@@ -1,4 +1,4 @@
-{% import 'macros.j2' as macros -%}
+{% import 'macros/base.j2' as macros -%}{% import 'macros/site.j2' as site -%}
 
 # Known Limitations and Issues
 <hr style="width:100%;border-bottom:3px solid black;">
@@ -22,7 +22,7 @@ Compose files used with [`compose.import` statements]({{mkdocs.site_relative_url
 
 Unfortunately, there's not a good way to convince `make` to just proxy arguments without parsing them.  **For example `./k8s.mk kubectl apply -f` looks convenient, but it won't work.**  (It will instead parse `apply -f` as arguments to make.)  
 
-The simplest workaround is to just use `cmd="apply ..." ./k8s.mk kubectl`.  However if [supervisors and signals](#supervisors-and-signals) are supported, then you can use the special form ' -- ', as in "./k8s.mk kubectl -- version --client".  See also [the smoke-tests]({{github.repo_url}}/tree/master/tests/Makefile.smoke-test-k8s.mk).
+The simplest workaround is to just use `cmd="apply ..." ./k8s.mk kubectl`.  However if [supervisors and signals](#supervisors-and-signals) are supported, then you can use the special form ' -- ', as in "./k8s.mk kubectl -- version --client".  See also [the smoke-tests](https://github.com/Robot-Wranglers/k8s-tools/tree/main/tests/Makefile.smoke-test-k8s.mk).
 #}
 
 #### Docker and File Permissions 

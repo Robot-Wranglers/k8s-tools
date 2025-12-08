@@ -1,4 +1,4 @@
-{% import 'macros.j2' as macros -%}
+{% import 'macros/base.j2' as macros -%}{% import 'macros/site.j2' as site -%}
 
 ## Overview
 <hr style="width:100%;border-bottom:3px solid black;">
@@ -59,7 +59,7 @@ Amongst other things it can help to fix the problem of different project develop
 You can also think of this project as a reference implementation for a pattern that [bridges compose services and Makefile targets]({{mkdocs.site_relative_url}}/compose.mk#makecompose-bridge), creating a "minimum viable automation framework" for things like [orchestrating tasks across tool containers]({{mkdocs.site_relative_url}}/compose.mk/#container-dispatch).  It's expressive and flexible, yet also focused on minimizing both conceptual overhead and software dependencies.  It's incredibly useful for lots of things, and whether it is a tool, a library, or a framework depends on how you decide to use it.  
 
 
-There's a lot of hate for `make` (especially for "creative" usage of it!), but you'll find that these are not the Makefile's of your ancestors.  Support for [container dispatch]({{mkdocs.site_relative_url}}/compose.mk#container-dispatch) feels like a tiny, unobtrusive DSL on top of tech you already know, and you can run it anywhere you are.  Less time spent negotiating with bolted-on plugin-frameworks, hook systems, and build-bots, more time for the problems you care about.  And yes, *the build-bots themselves will be happy to run your automation,* and the output is easy to parse.  See the [this repo's github actions](https://robot-wranglers.github.io/k8s-tools/actions?query=branch%3Amaster), which bootstrap and exercise a cluster as part of the [end to end tests]({{mkdocs.site_relative_url}}/demos#demo-cluster-automation).
+There's a lot of hate for `make` (especially for "creative" usage of it!), but you'll find that these are not the Makefile's of your ancestors.  Support for [container dispatch]({{mkdocs.site_relative_url}}/compose.mk#container-dispatch) feels like a tiny, unobtrusive DSL on top of tech you already know, and you can run it anywhere you are.  Less time spent negotiating with bolted-on plugin-frameworks, hook systems, and build-bots, more time for the problems you care about.  And yes, *the build-bots themselves will be happy to run your automation,* and the output is easy to parse.  See the [this repo's github actions](https://robot-wranglers.github.io/k8s-tools/actions?query=branch%3Amain), which bootstrap and exercise a cluster as part of the [end to end tests]({{mkdocs.site_relative_url}}/demos#demo-cluster-automation).
 
 **Working with [compose.mk]({{mkdocs.site_relative_url}}/compose.mk) and [k8s.mk]({{mkdocs.site_relative_url}}/k8s.mk) makes `make` hit different.**  
 

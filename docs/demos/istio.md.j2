@@ -1,4 +1,4 @@
-{% import 'macros.j2' as macros -%}
+{% import 'macros/base.j2' as macros -%}{% import 'macros/site.j2' as site -%}
 
 ## Traffic Management with Istio
 <hr style="width:100%;border-bottom:3px solid black;">
@@ -45,7 +45,7 @@ $ ./demos/istio.mk clean create deploy test
 #### Source Code
 <hr style="width:95%;border-bottom:1px dashed black;">
 
-{{macros.embed_demo(
+{{site.embed_demo(
     'demos/istio.mk', 
     github=github)}}
 
