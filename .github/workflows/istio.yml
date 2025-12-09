@@ -16,7 +16,10 @@ jobs:
     name: Traffic Management Demo
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
       - name: Initialize
         run: make clean 
         #init build

@@ -35,7 +35,7 @@ init: mk.stat docker.stat
 clean: flux.stage.clean
 	find . | grep .tmp | xargs rm 2>/dev/null || true
 
-build: build.bin tux.require build.services 
+build: tux.require build.services 
 	@# Containers are normally pulled on demand, 
 	@# but pre-caching cleans up the build logs.
 	${jb} foo=bar | ${jq} . > /dev/null
@@ -67,4 +67,3 @@ demos/cmk:
 sync:
 	cp -v ../compose.mk/docs/theme/css/* docs/theme/css
 	cp -v ../compose.mk/docs/theme/js/* docs/theme/js
-	cp -v ../compose.mk/compose.mk .
