@@ -78,7 +78,7 @@ Other external documentation might be relevant.  For example, combining `k8s.mk`
 $ ./k8s.mk k8s-tools.services
 ```
 ```ini {.cli_output}
-
+failed
 ```
 
 #### Shells & Task Dispatch

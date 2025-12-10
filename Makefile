@@ -21,11 +21,9 @@ export MKDOCS_LISTEN_PORT=8001
 # # export HELMIFY_CLI_VERSION?=v0.4.12
 
 include .cmk/compose.mk
-$(call compose.import, file=k8s-tools.yml)
 $(call mk.import.plugins, docs.mk actions.mk)
-# include docs/docs.mk
-docs: flux.stage/documentation docs.pynchon.build docs.README.static docs.jinja docs.pynchon.dispatch/.docs.build
-docs.README.static: README.md #demos/README.md demos/cmk/README.md
+# $(call compose.import, file=k8s-tools.yml)
+docs: flux.stage/documentation docs.pynchon.build README.md docs.jinja docs.pynchon.dispatch/mkdocs.build
 README.md:; ${docs.render.mirror}
 
 serve: docs.serve

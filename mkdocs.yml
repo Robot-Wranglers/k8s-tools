@@ -69,7 +69,7 @@ nav:
   - Other:
     - 'Configuration ': config.md
     - limitations.md
-    - contributing.md
+    # - contributing.md
     - 'Project Source': 'https://github.com/robot-wranglers/k8s-tools/'
 plugins:
   - search
