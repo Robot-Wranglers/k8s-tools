@@ -1,4 +1,4 @@
-{% import 'macros.j2' as macros -%}
+{% import 'macros/base.j2' as macros -%}{% import 'macros/site.j2' as site -%}
 
 ## Intro to Clusters
 <hr style="width:100%;border-bottom:3px solid black;">
@@ -28,7 +28,7 @@ The most direct way to manage clusters is by [using dispatch]({{mkdocs.site_rela
 <hr style="width:100%;border-bottom:3px solid black;">
 ---------------------#}
 
-{{macros.embed_demo(
+{{site.embed_demo(
     'demos/kind.mk', 
     github=github)}}
 
@@ -42,20 +42,20 @@ For each of [*minikube*]({{mkdocs.site_relative_url}}/api#api-minikube), [*k3d*]
 
 Amongst other thing this exposes targets like *`<cluster_type>.get_or_create/<cluster_name>`* for idempotent operations, and a tiny amount of boilerplate sets up everything:
 
-{{macros.embed_demo(
+{{site.embed_demo(
     'demos/kind-2.mk', 
     github=github)}}
 
 Besides using `kind.*` above, note also the usage of `stage/..` declarations, which adds a banner to automation output, and enables some support for artifact storage (like cluster connection details).[^2]
 
-{{macros.api_link_many('k3d minikube kind'.split(),mkdocs)}}
+{{site.api_link_many('k3d minikube kind'.split(),mkdocs)}}
 
 ### Scaffolded Clusters
 <hr style="width:100%;border-bottom:3px solid black;">
 
 In cases where the underlying cluster API meets the *cluster-interface*, you can skip defining individual targets as seen in the last section, and scaffold clusters directly from metadata.
 
-{{macros.embed_demo(
+{{site.embed_demo(
     'demos/kind-3.mk', 
     github=github)}}
 
@@ -64,7 +64,7 @@ For each of [*minikube*]({{mkdocs.site_relative_url}}/api#api-minikube), [*k3d*]
 
 Amongst other thing this exposes targets like *`<cluster_type>.get_or_create/<cluster_name>`* for idempotent operations, and a tiny amount of boilerplate sets up everything:
 
-{{macros.embed_demo(
+{{site.embed_demo(
     'demos/kind.mk', 
     github=github)}}
 

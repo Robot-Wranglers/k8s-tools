@@ -1,4 +1,4 @@
-{% import 'macros.j2' as macros -%}
+{% import 'macros/base.j2' as macros -%}{% import 'macros/site.j2' as site -%}
 
 ## Kompose
 <hr style="width:100%;border-bottom:3px solid black;">
@@ -43,9 +43,9 @@ $ ./demos/cmk/kompose.cmk clean build create deploy test
 
 The source code below uses containers from [the toolbox]({{mkdocs.site_relative_url}}/toolbox) and primitives from the [`k8s.mk` API]({{mkdocs.site_relative_url}}/k8s.mk).  Since `k8s.mk` is built on top of [compose.mk]({{jinja.vars.composemk_docs_url}}), you might want some of that background to completely understand the demo, but for the most part it should be pretty easy to read and adapt.
 
-{{macros.embed_demo(
+{#{site.embed_demo(
     'demos/cmk/kompose.cmk',
-    github=github)}}
+    github=github)}#}
 
 <hr style="width:100%;border-bottom:3px solid black;">
 

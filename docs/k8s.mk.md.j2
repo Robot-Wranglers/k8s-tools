@@ -1,4 +1,4 @@
-{% import 'macros.j2' as macros -%}
+{% import 'macros/base.j2' as macros -%}{% import 'macros/site.j2' as site -%}
 
 ## Automation With k8s.mk
 <hr style="width:100%;border-bottom:3px solid black;">
@@ -216,7 +216,7 @@ For this section, `KUBECONFIG` should already be set, and you might want to use 
 #### Helm
 <hr style="width:95%;border-bottom:1px dashed black;">
 
-With the k8s-tools suite, you can use `helm` directly but the simplest and most idempotent approach to installing things is usually via {{macros.api_link('ansible.helm', mkdocs)}}.  *(See also the [upstream ansible docs](https://docs.ansible.com/ansible/latest/collections/kubernetes/core/helm_module.html))*
+With the k8s-tools suite, you can use `helm` directly but the simplest and most idempotent approach to installing things is usually via {{site.api_link('ansible.helm', mkdocs)}}.  *(See also the [upstream ansible docs](https://docs.ansible.com/ansible/latest/collections/kubernetes/core/helm_module.html))*
 
 {#Again, if you're more interested in scripting you might prefer to skip to the [Cluster Lifecycle Demo]({{mkdocs.site_relative_url}}/demos#demo-cluster-automation), but here we'll use the CLI.#}
 
@@ -271,7 +271,7 @@ Tidy. We took advantage of a discrete and useful piece of ansible without instal
 
 Since kubernetes is a distributed system, we don't necessarily want to be restricted to sequential activities in our scripts.  There are several ways to go about this, and lots of utilities in the k8s-tools suite will individually default to async and optionally support some kind of `--wait` argument. 
 
-Actually the helm commands in the last section can be turned into blocking ones by simply passing `wait=true`, but suppose you don't know this though, or the tool doesn't support it, or orchestration is much more complex.  In this case and in many others, {{macros.api_link('k8s.wait', mkdocs)}} is your best friend.
+Actually the helm commands in the last section can be turned into blocking ones by simply passing `wait=true`, but suppose you don't know this though, or the tool doesn't support it, or orchestration is much more complex.  In this case and in many others, {{site.api_link('k8s.wait', mkdocs)}} is your best friend.
 
 Changing the previous helm example to wait for the whole cluster to settle looks like this:
 
@@ -286,7 +286,7 @@ $ ./k8s.mk jb name=ahoy \
 !!! closer_look "Closer Look"
     The JSON input sets defaults for the call to `ansible.helm`, and then `k8s.wait` runs to show a looping status display which indicates exactly what's still pending and what the cluster is up to.  Under the hood, it uses a colorized, looping version of krew's kubectl-sick-pods plugin[^2].
 
-In a similar fashion you can use {{macros.api_link('k8s.namespace.wait', mkdocs,arg='namespace')}} to block on one particular namespace.
+In a similar fashion you can use {{site.api_link('k8s.namespace.wait', mkdocs,arg='namespace')}} to block on one particular namespace.
 {#, which opens up more interesting possibilities.#}
 
 As [highlighted elsewhere](#), the nature of Makefile ensures that the `k8s.mk` CLI is essentially one-to-one with the API.  

@@ -20,19 +20,20 @@ export MKDOCS_LISTEN_PORT=8001
 # # export KN_CLI_VERSION?=v1.14.0
 # # export HELMIFY_CLI_VERSION?=v0.4.12
 
-include compose.mk
-$(call compose.import, file=k8s-tools.yml)
+include .cmk/compose.mk
+$(call mk.import.plugins, docs.mk actions.mk)
+# $(call compose.import, file=k8s-tools.yml)
+docs: flux.stage/documentation docs.pynchon.build README.md docs.jinja docs.pynchon.dispatch/mkdocs.build
+README.md:; ${docs.render.mirror}
 
-include docs/docs.mk
-include .github/actions.mk
-
+serve: docs.serve
 __main__: init clean build test docs
 init: mk.stat docker.stat 
 
 clean: flux.stage.clean
 	find . | grep .tmp | xargs rm 2>/dev/null || true
 
-build: build.bin tux.require build.services 
+build: tux.require build.services 
 	@# Containers are normally pulled on demand, 
 	@# but pre-caching cleans up the build logs.
 	${jb} foo=bar | ${jq} . > /dev/null
@@ -64,4 +65,3 @@ demos/cmk:
 sync:
 	cp -v ../compose.mk/docs/theme/css/* docs/theme/css
 	cp -v ../compose.mk/docs/theme/js/* docs/theme/js
-	cp -v ../compose.mk/compose.mk .

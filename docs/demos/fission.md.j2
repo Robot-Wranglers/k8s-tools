@@ -1,4 +1,4 @@
-{% import 'macros.j2' as macros -%}
+{% import 'macros/base.j2' as macros -%}{% import 'macros/site.j2' as site -%}
 
 ## FaaS with Fission
 <hr style="width:100%;border-bottom:3px solid black;">
@@ -52,7 +52,7 @@ $ ./demos/fission.mk clean
 ### Source Code 
 <hr style="width:100%;border-bottom:3px solid black;">
 
-{{macros.embed_demo(
+{{site.embed_demo(
     'demos/fission.mk', github=github)}}
 
 

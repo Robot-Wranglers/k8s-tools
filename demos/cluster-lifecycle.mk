@@ -98,9 +98,9 @@ infra.test:
 # Simulate some application testing after setup is done. 
 # This pulls data from a pod container deployed to the cluster,
 # shows an overview of whatever's already been deployed with helm.
-app.test:
+app.test: 
 	label="Demo pod connectivity" ${make} io.print.banner
-	echo uname -n | ${make} kubectl.exec.pipe/${pod_namespace}/${pod_name}
+	# echo uname -n | ${make} kubectl.exec.pipe/${pod_namespace}/${pod_name}
 	label="Helm Overview" ${make} io.print.banner helm.stat
 
 # Grafana setup and other optional, more interactive stuff that's part of

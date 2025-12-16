@@ -1,4 +1,4 @@
-{% import 'macros.j2' as macros -%}
+{% import 'macros/base.j2' as macros -%}{% import 'macros/site.j2' as site -%}
 
 ## Debugging with Kubetail
 <hr style="width:100%;border-bottom:3px solid black;">
@@ -12,7 +12,7 @@ Kubetail is great, check out the official project page[^1].  One of the most ted
 
 For this demo, we'll just extend the [FaaS demo]({{mkdocs.site_relative_url}}/demos/fission) and show how to use the logging helpers after the main setup is done.  This makes the demo implementation pretty short:
 
-{{macros.embed_demo(
+{{site.embed_demo(
     'demos/kubetail.mk',
     github=github)}}
 

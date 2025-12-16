@@ -1,4 +1,4 @@
-{% import 'macros.j2' as macros -%}
+{% import 'macros/base.j2' as macros -%}{% import 'macros/site.j2' as site -%}
 
 ## Features
 <br/>
@@ -25,7 +25,7 @@ The overall focus for `k8s-tools.yml` is to stand alone with no host dependencie
 
 Here's a quick overview of the manifest and some details about versioning:
 
-**Local parts of the tool bundle:** ([See the latest here]({{github.repo_url}}/tree/master/k8s-tools.yml))
+**Local parts of the tool bundle:** ([See the latest here](https://github.com/Robot-Wranglers/k8s-tools/tree/main/k8s-tools.yml))
 
 * Cluster management: [kind](https://github.com/kubernetes-sigs/kind), [k3d](https://k3d.io/)
 * Workflows, FaaS, and Misc Platforming Tools: [argocli](https://argo-workflows.readthedocs.io/en/latest/walk-through/argo-cli/), [kn](https://knative.dev/docs/client/install-kn/), [fission](https://fission.io/docs/installation/), [rancher](https://github.com/rancher/cli)
@@ -35,7 +35,7 @@ Here's a quick overview of the manifest and some details about versioning:
 * TUI and user-messaging utilities: [gum](https://github.com/charmbracelet/gum), [pv](https://www.ivarch.com/programs/pv.shtml), [spark](https://raw.githubusercontent.com/holman/spark/), [tte](https://github.com/ChrisBuilds/terminaltexteffects)
 * General Utilities: Fixed (i.e. non-busybox) versions of things like date, ps, uuidgen, etc
 
-**Upstream parts of the tool bundle** ([See the latest here](https://github.com/alpine-docker/k8s/blob/master/README.md#installed-tools))
+**Upstream parts of the tool bundle** ([See the latest here](https://github.com/alpine-docker/k8s/blob/main/README.md#installed-tools))
 
 * Cluster management: [eksctl](https://github.com/weaveworks/eksctl)
 * Core Utilities: [kubectl](https://kubernetes.io/docs/tasks/tools/install-kubectl/), [kustomize](https://github.com/kubernetes-sigs/kustomize), [helm](https://github.com/helm/helm), [krew](https://github.com/kubernetes-sigs/krew)

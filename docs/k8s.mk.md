@@ -282,7 +282,7 @@ $ ./k8s.mk jb name=ahoy \
 !!! closer_look "Closer Look"
     The JSON input sets defaults for the call to `ansible.helm`, and then `k8s.wait` runs to show a looping status display which indicates exactly what's still pending and what the cluster is up to.  Under the hood, it uses a colorized, looping version of krew's kubectl-sick-pods plugin[^2].
 
-In a similar fashion you can use  <a style="" href="/k8s-tools/api/#k8snamespacewaitarg" >k8s.namespace.wait/namespace</a> to block on one particular namespace.
+In a similar fashion you can use  <a style="" href="/k8s-tools/api/#k8snamespacewaitarg" >k8s.namespace.wait/&lt;namespace&gt;</a> to block on one particular namespace.
 
 
 As [highlighted elsewhere](#), the nature of Makefile ensures that the `k8s.mk` CLI is essentially one-to-one with the API.  

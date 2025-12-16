@@ -1,4 +1,4 @@
-{% import 'macros.j2' as macros -%}
+{% import 'macros/base.j2' as macros -%}{% import 'macros/site.j2' as site -%}
 
 ## Toolbox & Manifest
 <hr style="width:100%;border-bottom:3px solid black;">
@@ -21,7 +21,7 @@ Here's a quick overview of the manifest and some details about versioning.
 #### Upstream parts of the tool bundle
 <hr style="width:95%;border-bottom:1px dashed black;">
 
-These tools are packaged together as part of alpine-docker, thus basically getting one version number/tag on that container. Therefore they are not as *independently versioned* as most of the other tools, but `k8s-tools.yml` has service-stubs for quick overrides in case you need something specific.  See the [latest alpine info here](https://github.com/alpine-docker/k8s/blob/master/README.md#installed-tools).
+These tools are packaged together as part of alpine-docker, thus basically getting one version number/tag on that container. Therefore they are not as *independently versioned* as most of the other tools, but `k8s-tools.yml` has service-stubs for quick overrides in case you need something specific.  See the [latest alpine info here](https://github.com/alpine-docker/k8s/blob/main/README.md#installed-tools).
 
 * **Core Utilities:** [kubectl](https://kubernetes.io/docs/tasks/tools/install-kubectl/), [kustomize](https://github.com/kubernetes-sigs/kustomize), [helm](https://github.com/helm/helm), [krew](https://github.com/kubernetes-sigs/krew)
 * **Misc Utilities:** [helm-diff](https://github.com/databus23/helm-diff), [helm-unittest](https://github.com/helm-unittest/helm-unittest), [helm-push](https://github.com/chartmuseum/helm-push), [kubeseal](https://github.com/bitnami-labs/sealed-secrets), [vals](https://github.com/helmfile/vals), [kubeconform](https://github.com/yannh/kubeconform), 
@@ -30,7 +30,7 @@ These tools are packaged together as part of alpine-docker, thus basically getti
 #### Local parts of the tool bundle
 <hr style="width:95%;border-bottom:1px dashed black;">
 
-These tools are separate from alpine docker.  An official image base is used when possible, extending it where necessary.  If that's not possible, we build in-place by inlining a Dockerfile.  For details, see the [latest k8s-tools.yml here]({{github.repo_url}}/tree/master/k8s-tools.yml)
+These tools are separate from alpine docker.  An official image base is used when possible, extending it where necessary.  If that's not possible, we build in-place by inlining a Dockerfile.  For details, see the [latest k8s-tools.yml here](https://github.com/Robot-Wranglers/k8s-tools/tree/main/k8s-tools.yml)
 
 * **Cluster management:** [kind](https://github.com/kubernetes-sigs/kind), [k3d](https://k3d.io/), [minikube](https://minikube.sigs.k8s.io), [kubeadm](https://kubernetes.io/docs/reference/setup-tools/kubeadm/)
 * **Cloud Utilities:** [eksctl](https://github.com/weaveworks/eksctl), [aws cdk](https://docs.aws.amazon.com/cdk), [awscli v1](https://github.com/aws/aws-cli), [aws-iam-authenticator](https://github.com/kubernetes-sigs/aws-iam-authenticator), [gcloud sdk](https://hub.docker.com/r/google/cloud-sdk)* 

@@ -3,12 +3,12 @@ name: Cluster Lifecycle
 on:
   workflow_dispatch: {}
   workflow_call: {}
-  push:
-    branches: [ "main" ]
-    paths-ignore:  ['**.gif', '**.md', '**.md.j2', '**.mmd', '**.png', '**.svg']
-  pull_request:
-    branches: [ "main" ]
-    paths-ignore:  ['**.gif', '**.md', '**.md.j2', '**.mmd', '**.png', '**.svg']
+  # push:
+  #   branches: [ "main" ]
+  #   paths-ignore:  ['**.gif', '**.md', '**.md.j2', '**.mmd', '**.png', '**.svg']
+  # pull_request:
+  #   branches: [ "main" ]
+  #   paths-ignore:  ['**.gif', '**.md', '**.md.j2', '**.mmd', '**.png', '**.svg']
 permissions:
   contents: read
 jobs:
@@ -16,7 +16,10 @@ jobs:
     name: Cluster Lifecycle
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
       - name: Initialize
         run: make clean init build
       - name: Run Cluster Lifecycle

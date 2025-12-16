@@ -1,3 +1,4 @@
+{% import 'macros/base.j2' as macros -%}{% import 'macros/site.j2' as site -%}
 ## Quickstart
 <br/>
 
@@ -13,11 +14,11 @@ $ cd myproject
 
 # Download compose.mk, k8s.mk, and k8s-tools.yml
 $ curl -sLo compose.mk \
-    https://raw.githubusercontent.com/Robot-Wranglers/k8s-tools/master/compose.mk
+    https://raw.githubusercontent.com/Robot-Wranglers/k8s-tools/main/compose.mk
 $ curl -sLo k8s.mk \
-    https://raw.githubusercontent.com/Robot-Wranglers/k8s-tools/master/k8s.mk
+    https://raw.githubusercontent.com/Robot-Wranglers/k8s-tools/main/k8s.mk
 $ curl -sLo k8s-tools.yml \
-    https://raw.githubusercontent.com/Robot-Wranglers/k8s-tools/master/k8s-tools.yml
+    https://raw.githubusercontent.com/Robot-Wranglers/k8s-tools/main/k8s-tools.yml
 
 # Make scripts executable
 $ chmod +x compose.mk k8s.mk k8s-tools.yml
@@ -47,7 +48,7 @@ $ cd myproject
 
 # Download compose.mk, k8s.mk, and k8s-tools.yml
 $ curl -sLo compose.mk \
-    https://raw.githubusercontent.com/Robot-Wranglers/k8s-tools/master/k8s
+    https://raw.githubusercontent.com/Robot-Wranglers/k8s-tools/main/k8s
 $ chmod +x ./k8s
 
 # Alternatively, generate `k8s` omnibus from existing files:

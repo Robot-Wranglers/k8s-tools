@@ -1,3 +1,4 @@
-{%include "badges.md.j2" %} 
+{% import 'macros/base.j2' as macros -%}{% import 'macros/site.j2' as site -%}
+{% include "badges.md.j2" %} 
 
-See the main documentation: [https://robot-wranglers.github.io/k8s-tools/](https://robot-wranglers.github.io/k8s-tools/)
+Main documentation: [{{mkdocs.config.site_url}}]({{mkdocs.config.site_url}})
