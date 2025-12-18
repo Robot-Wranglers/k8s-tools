@@ -35,7 +35,9 @@
 # Setup the default target that will do everything, end to end.
 #░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 
+include .cmk/compose.mk
 include k8s.mk
+
 export KUBECONFIG:=./local.cluster.yml
 $(shell umask 066; touch ${KUBECONFIG})
 

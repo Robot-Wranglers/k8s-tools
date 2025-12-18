@@ -22,9 +22,10 @@
 #
 # REF:
 #   [1] https://robot-wranglers.github.io/k8s-tools
+#   [2] https://argoproj.github.io/argo-events/quick_start/
 #░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 
-include compose.mk 
+include .cmk/compose.mk 
 include k8s.mk
 
 # Ensure local KUBECONFIG exists & ignore anything from environment
@@ -53,7 +54,6 @@ wait cluster.wait: k8s.cluster.wait
 # Deployment & tests for ArgoWF and Argo Events.
 #░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 
-# https://argoproj.github.io/argo-events/quick_start/
 define argo.events.manifests
  https://raw.githubusercontent.com/argoproj/argo-events/stable/manifests/install.yaml
  https://raw.githubusercontent.com/argoproj/argo-events/stable/manifests/install-validating-webhook.yaml

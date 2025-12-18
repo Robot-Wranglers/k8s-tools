@@ -55,11 +55,12 @@ else
 export K8S_MK_LIB=1
 endif
 
-ifeq ($(strip $(if $(filter undefined,$(origin CMK_SRC)),,$(CMK_SRC))),)
-endif
-ifeq ($(filter ${MAKEFILE_LIST},compose.mk),)
-include compose.mk
-endif
+#ifeq ($(strip $(if $(filter undefined,$(origin CMK_SRC)),,$(CMK_SRC))),)
+#endif
+#ifeq ($(filter ${MAKEFILE_LIST},compose.mk),)
+#ifneq (,$(findstring compose.mk,${MAKEFILE_LIST}))
+#$(error ${MAKEFILE_LIST})
+#endif
 ifeq ($(K8SMK_STANDALONE),1)
 #$(shell >&2 echo "stand-alone mode; importing tools containers froms k8s-tools.yml")
 $(call compose.import, file=${K8S_TOOLS})
@@ -385,7 +386,7 @@ fission.function.create/%:; $(call containerized.maybe, fission, fission_code fi
 	&& ( \
 		 $(call _fission.function.assert,${*}) \
 		 && $(call io.log.part2, ${dim_green}ok) \
-		 || ($(call io.log.part2, ${ital}not created yet) \
+		 || ($(call io.log.part2, ${yellow}not created yet) \
 			&& set -x \
 			&& fission function create --name ${*} \
 				--env $${fission_env} --code $${fission_code}) )
@@ -415,7 +416,7 @@ fission.stat:; $(call containerized.maybe, fission)
 fission.assert.env/%:; $(call containerized.maybe, fission)
 	@# Succeeds only when the given environment exists 
 	@# for the currently active namespace.  No output.
-.fission.assert.env/%:;
+.fission.assert.env/%:
 	fission env list \
 		| awk '{print $$1}' \
 		| tail -n+2 | grep ${*} 2> /dev/null >/dev/null
@@ -426,7 +427,7 @@ fission.env.create/%:; $(call containerized.maybe, fission,img)
 	@# set in the environment.
 .fission.env.create/%: mk.assert.env/img
 	$(call io.log.part1, ${GLYPH_K8S} ${sep} fission.env.create ${sep} ${dim}Checking for environment ${bold}${*})
-	${make} fission.assert.env/${*} \
+	${make} fission.assert.env/${*} 2>/dev/null \
 	&& $(call io.log.part2, ${no_ansi_dim}already exists) \
 	|| ( $(call io.log.part2, ${no_ansi}${yellow}not created yet) \
 		&& set -x \
@@ -1164,7 +1165,7 @@ k8s.stat.env:
 	(   (env | grep CLUSTER || true) \
 	  ; (env | grep KUBE    || true) \
 	  ; (env | grep DOCKER  || true) \
-	) | ${stream.grep.safe} | ${stream.indent} 
+	) #| ${stream.grep.safe} | ${stream.indent} 
 
 k8s.stat.ns:
 	@# Shows all namespaces for the current cluster.
