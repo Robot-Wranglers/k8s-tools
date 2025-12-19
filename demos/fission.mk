@@ -20,7 +20,9 @@
 #   ./demos/fission.mk teardown
 #
 # REF:
-#   [1] https://robot-wranglers.github.io/k8s-tools/demos/faas
+#  [1] https://robot-wranglers.github.io/k8s-tools/demos/faas
+#  [2] https://fission.io/docs/installation/
+#  [3] https://fission.io/docs/reference/fission-cli/fission_token_create/
 #░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 
 # Boilerplate.  
@@ -30,6 +32,7 @@
 # Setup the default target that will do everything, end to end.
 #░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 
+include .cmk/compose.mk
 include k8s.mk
 export KUBECONFIG:=./local.cluster.yml
 $(shell umask 066; touch ${KUBECONFIG})
@@ -42,6 +45,9 @@ __main__: clean create deploy test
 #░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 
 cluster.name:=fission
+fission.namespace=fission
+fission.url=https://github.com/fission/fission/releases/download/v1.21.0/fission-all-v1.21.0-minikube.yaml
+
 
 clean: stage/cluster.clean k3d.cluster.delete/${cluster.name}
 	@# Clean up cluster
@@ -60,12 +66,7 @@ shell: fission.shell
 	@# Shell inherits this environment, i.e. KUBECONFIG is already configured
 	
 # Local cluster details
-#  - https://fission.io/docs/installation/
-#  - https://fission.io/docs/reference/fission-cli/fission_token_create/
 #░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
-
-fission.namespace=fission
-fission.url=https://github.com/fission/fission/releases/download/v1.21.0/fission-all-v1.21.0-minikube.yaml
 
 infra.setup: stage/infra.setup k8s.dispatch/.infra.setup wait
 	@# Bootstrap infrastructure and wait till cluster settles

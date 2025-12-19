@@ -12,6 +12,7 @@
 #   [1] https://robot-wranglers.github.io/k8s-tools/demos/tilt/
 #░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 
+include .cmk/compose.mk
 include k8s.mk
 export KUBECONFIG:=./local.cluster.yml
 export TILT_PORT=10351
